@@ -24,6 +24,10 @@ insert into public.permissions (key, description) values
   ('notes.create',     'Create notes'),
   ('notes.update',     'Edit notes'),
   ('notes.delete',     'Delete notes'),
+  ('notebook.view',    'View shared notes'),
+  ('notebook.create',  'Create shared notes & folders'),
+  ('notebook.update',  'Edit shared notes & folders'),
+  ('notebook.delete',  'Delete shared notes & folders'),
   ('files.view',       'View files'),
   ('files.upload',     'Upload files'),
   ('files.delete',     'Delete files'),
@@ -50,6 +54,7 @@ where r.is_default
     'deals.view','deals.create','deals.update',
     'tasks.view','tasks.create','tasks.update',
     'notes.view','notes.create','notes.update',
+    'notebook.view','notebook.create','notebook.update',
     'files.view','files.upload',
     'team.view','settings.view','ai.use'
   )

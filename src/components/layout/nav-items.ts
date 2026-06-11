@@ -4,6 +4,7 @@ import {
   Users,
   Briefcase,
   CheckSquare,
+  NotebookPen,
   FolderOpen,
   Settings,
   type LucideIcon,
@@ -38,6 +39,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Tasks",
     icon: CheckSquare,
     permission: "tasks.view",
+  },
+  {
+    href: "/notes",
+    label: "Notes",
+    icon: NotebookPen,
+    permission: "notebook.view",
   },
   {
     href: "/files",
