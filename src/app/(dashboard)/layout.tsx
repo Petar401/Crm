@@ -19,6 +19,7 @@ export default async function DashboardLayout({
           workspaceName={ctx.workspace.name}
           email={ctx.email}
           fullName={ctx.profile?.full_name ?? null}
+          allowed={[...allowed]}
         />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>

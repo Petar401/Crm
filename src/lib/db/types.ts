@@ -18,7 +18,12 @@ export type ActivityType =
   | "task_completed"
   | "stage_changed"
   | "file_uploaded";
-export type EntityType = "company" | "contact" | "deal" | "note";
+export type EntityType =
+  | "company"
+  | "contact"
+  | "deal"
+  | "note"
+  | "workspace";
 
 export interface Profile {
   id: string;
@@ -175,8 +180,19 @@ export interface Attachment {
   storage_path: string;
   mime_type: string | null;
   file_size: number | null;
+  folder_id: string | null;
   uploaded_by: string | null;
   created_at: string;
+}
+
+export interface Folder {
+  id: string;
+  workspace_id: string;
+  parent_id: string | null;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Role {

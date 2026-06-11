@@ -6,6 +6,7 @@ import { getMembers } from "@/features/team/queries";
 import { isAiConfigured } from "@/features/ai/gemini";
 import { TeamSettings } from "@/features/team/components/team-settings";
 import { InviteMemberDialog } from "@/features/team/components/invite-member-dialog";
+import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +53,15 @@ export default async function SettingsPage() {
                 <Badge variant="outline">Not configured</Badge>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Change password</CardTitle>
+          </CardHeader>
+          <CardContent className="max-w-sm">
+            <ChangePasswordForm />
           </CardContent>
         </Card>
 

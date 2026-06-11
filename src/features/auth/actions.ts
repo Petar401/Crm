@@ -10,6 +10,7 @@ import {
   signupSchema,
   forgotPasswordSchema,
   updatePasswordSchema,
+  changePasswordSchema,
 } from "@/features/auth/schemas";
 
 export interface ActionResult {
@@ -126,6 +127,40 @@ export async function updatePasswordAction(
 
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+/**
+ * Changes the password for an already-authenticated user from Settings. Unlike
+ * `updatePasswordAction` (recovery flow), this re-verifies the current password
+ * first and does not redirect, so the user stays where they are.
+ */
+export async function changePasswordAction(
+  values: unknown
+): Promise<ActionResult & { success?: boolean }> {
+  const parsed = changePasswordSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { error: "You must be signed in." };
+
+  // Re-authenticate with the current password before allowing a change.
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: parsed.data.currentPassword,
+  });
+  if (verifyError) return { error: "Your current password is incorrect." };
+
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+  });
+  if (error) return { error: error.message };
+
+  return { success: true };
 }
 
 export async function signOutAction(): Promise<void> {
