@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { PermissionKey } from "@/lib/constants/permissions";
 import { NAV_ITEMS } from "@/components/layout/nav-items";
+import { Logo } from "@/components/shared/logo";
 
 export function Sidebar({ allowed }: { allowed: PermissionKey[] }) {
   const pathname = usePathname();
@@ -18,9 +19,7 @@ export function Sidebar({ allowed }: { allowed: PermissionKey[] }) {
   return (
     <aside className="bg-sidebar hidden w-60 shrink-0 flex-col border-r md:flex">
       <div className="flex h-14 items-center gap-2 border-b px-5">
-        <div className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md text-sm font-bold">
-          EA
-        </div>
+        <Logo className="size-7" />
         <span className="text-sm font-semibold">CRM</span>
       </div>
       <nav className="flex-1 space-y-1 p-3">
