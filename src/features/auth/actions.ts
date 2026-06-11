@@ -49,12 +49,20 @@ export async function signupAction(values: unknown): Promise<ActionResult> {
 
   if (error) return { error: error.message };
 
-  // If email confirmation is required, there is no session yet.
+  // Users are auto-confirmed at the DB level (see migration 0007), but Supabase
+  // may still withhold a session at signup when email confirmation is enabled.
+  // Sign in immediately to obtain a session before bootstrapping the workspace.
   if (!data.session) {
-    return {
-      error:
-        "Check your email to confirm your account, then sign in to finish setup.",
-    };
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+    if (signInError) {
+      return {
+        error:
+          "Account created. Please sign in to finish setting up your workspace.",
+      };
+    }
   }
 
   // Session active — create the workspace and owner membership.
