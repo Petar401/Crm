@@ -2,51 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  Briefcase,
-  CheckSquare,
-  FolderOpen,
-  Settings,
-  type LucideIcon,
-} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { PermissionKey } from "@/lib/constants/permissions";
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  permission?: PermissionKey;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  {
-    href: "/companies",
-    label: "Companies",
-    icon: Building2,
-    permission: "companies.view",
-  },
-  {
-    href: "/contacts",
-    label: "Contacts",
-    icon: Users,
-    permission: "contacts.view",
-  },
-  { href: "/deals", label: "Deals", icon: Briefcase, permission: "deals.view" },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare, permission: "tasks.view" },
-  { href: "/files", label: "Files", icon: FolderOpen, permission: "files.view" },
-  {
-    href: "/settings",
-    label: "Settings",
-    icon: Settings,
-    permission: "settings.view",
-  },
-];
+import { NAV_ITEMS } from "@/components/layout/nav-items";
 
 export function Sidebar({ allowed }: { allowed: PermissionKey[] }) {
   const pathname = usePathname();

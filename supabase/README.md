@@ -13,6 +13,10 @@ by pasting into the dashboard SQL editor.
 | `migrations/0003_activity_files.sql` | Tasks, notes, activities, attachments |
 | `migrations/0004_permissions.sql` | Permission catalog tables + `has_permission()` resolver |
 | `migrations/0005_rls.sql` | Enables RLS, all policies, and the `attachments` storage bucket |
+| `migrations/0006_hardening.sql` | Additional hardening |
+| `migrations/0007_autoconfirm_users.sql` | Auto-confirm new signups |
+| `migrations/0008_notebook.sql` | Shared Notebook: note folders + standalone notes, permissions, and RLS |
+| `migrations/0009_file_folders.sql` | Folders + workspace-level files for the Files manager |
 | `seed.sql` | Permission catalog rows (required) + default-role baseline |
 
 ## Apply with the Supabase CLI (recommended)
@@ -35,7 +39,7 @@ migrations and `seed.sql` automatically).
 ## Apply via the dashboard
 
 Open **SQL Editor** and run, in order: `0001` → `0002` → `0003` → `0004` →
-`0005`, then `seed.sql`.
+`0005` → `0006` → `0007` → `0008` → `0009`, then `seed.sql`.
 
 ## After applying
 

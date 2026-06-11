@@ -25,6 +25,10 @@ export const PERMISSION_KEYS = [
   "notes.create",
   "notes.update",
   "notes.delete",
+  "notebook.view",
+  "notebook.create",
+  "notebook.update",
+  "notebook.delete",
   "files.view",
   "files.upload",
   "files.delete",
@@ -93,6 +97,15 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "notes.create", description: "Create notes" },
       { key: "notes.update", description: "Edit notes" },
       { key: "notes.delete", description: "Delete notes" },
+    ],
+  },
+  {
+    label: "Notebook",
+    permissions: [
+      { key: "notebook.view", description: "View shared notes" },
+      { key: "notebook.create", description: "Create shared notes & folders" },
+      { key: "notebook.update", description: "Edit shared notes & folders" },
+      { key: "notebook.delete", description: "Delete shared notes & folders" },
     ],
   },
   {

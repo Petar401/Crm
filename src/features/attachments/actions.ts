@@ -14,12 +14,13 @@ export interface ActionResult {
 }
 
 const metadataSchema = z.object({
-  entity_type: z.enum(["company", "contact", "deal", "note"]),
+  entity_type: z.enum(["company", "contact", "deal", "note", "workspace"]),
   entity_id: z.string().uuid(),
   file_name: z.string().min(1),
   storage_path: z.string().min(1),
   mime_type: z.string().optional(),
   file_size: z.number().int().nonnegative().optional(),
+  folder_id: z.string().uuid().nullable().optional(),
 });
 
 /** Records attachment metadata after the file has been uploaded to storage. */
@@ -47,6 +48,7 @@ export async function recordAttachment(values: unknown): Promise<ActionResult> {
     storage_path: parsed.data.storage_path,
     mime_type: parsed.data.mime_type ?? null,
     file_size: parsed.data.file_size ?? null,
+    folder_id: parsed.data.folder_id ?? null,
     uploaded_by: ctx.userId,
   });
 
@@ -63,6 +65,103 @@ export async function recordAttachment(values: unknown): Promise<ActionResult> {
   });
 
   revalidatePath("/", "layout");
+  return {};
+}
+
+const folderSchema = z.object({
+  name: z.string().trim().min(1, "Enter a folder name").max(120),
+  parent_id: z.string().uuid().nullable().optional(),
+});
+
+/** Creates a folder in the workspace file manager. */
+export async function createFolder(
+  values: unknown
+): Promise<ActionResult & { id?: string }> {
+  const parsed = folderSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const ctx = await requireAuthContext();
+  await requirePermission("files.upload");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("folders")
+    .insert({
+      workspace_id: ctx.workspace.id,
+      parent_id: parsed.data.parent_id ?? null,
+      name: parsed.data.name,
+      created_by: ctx.userId,
+    })
+    .select("id")
+    .single<{ id: string }>();
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/files");
+  return { id: data.id };
+}
+
+/** Renames an existing folder. */
+export async function renameFolder(
+  id: string,
+  name: string
+): Promise<ActionResult> {
+  const parsed = folderSchema.pick({ name: true }).safeParse({ name });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const ctx = await requireAuthContext();
+  await requirePermission("files.upload");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("folders")
+    .update({ name: parsed.data.name })
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspace.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/files");
+  return {};
+}
+
+/** Deletes an empty folder (no files and no subfolders). */
+export async function deleteFolder(id: string): Promise<ActionResult> {
+  const ctx = await requireAuthContext();
+  await requirePermission("files.delete");
+
+  const supabase = await createClient();
+
+  const [{ count: fileCount }, { count: subfolderCount }] = await Promise.all([
+    supabase
+      .from("attachments")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", ctx.workspace.id)
+      .eq("folder_id", id),
+    supabase
+      .from("folders")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", ctx.workspace.id)
+      .eq("parent_id", id),
+  ]);
+
+  if ((fileCount ?? 0) > 0 || (subfolderCount ?? 0) > 0) {
+    return { error: "Folder is not empty. Remove its contents first." };
+  }
+
+  const { error } = await supabase
+    .from("folders")
+    .delete()
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspace.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/files");
   return {};
 }
 
