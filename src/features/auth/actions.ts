@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/utils/site-url";
 import {
   loginSchema,
   signupSchema,
   forgotPasswordSchema,
+  updatePasswordSchema,
 } from "@/features/auth/schemas";
 
 export interface ActionResult {
@@ -85,11 +87,45 @@ export async function forgotPasswordAction(
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(
-    parsed.data.email
+    parsed.data.email,
+    { redirectTo: `${getSiteUrl()}/auth/callback?next=/reset-password` }
   );
   if (error) return { error: error.message };
 
   return { success: true };
+}
+
+/**
+ * Sets a new password for the currently authenticated user. Used by the
+ * reset-password page after the recovery link has established a session via
+ * /auth/callback, and works as a general change-password action too.
+ */
+export async function updatePasswordAction(
+  values: unknown
+): Promise<ActionResult> {
+  const parsed = updatePasswordSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      error:
+        "Your reset link has expired. Request a new password reset email and try again.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath("/", "layout");
+  redirect("/");
 }
 
 export async function signOutAction(): Promise<void> {
