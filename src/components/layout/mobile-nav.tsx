@@ -8,6 +8,7 @@ import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PermissionKey } from "@/lib/constants/permissions";
 import { NAV_ITEMS } from "@/components/layout/nav-items";
+import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -40,9 +41,7 @@ export function MobileNav({ allowed }: { allowed: PermissionKey[] }) {
       </SheetTrigger>
       <SheetContent side="left" className="w-64 p-0">
         <SheetHeader className="h-14 flex-row items-center gap-2 border-b">
-          <div className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md text-sm font-bold">
-            EA
-          </div>
+          <Logo className="size-7" />
           <SheetTitle className="text-sm">CRM</SheetTitle>
         </SheetHeader>
         <nav className="space-y-1 p-3">
