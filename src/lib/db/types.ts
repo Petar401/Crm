@@ -151,6 +151,26 @@ export interface Note {
   updated_at: string;
 }
 
+export interface NoteFolder {
+  id: string;
+  workspace_id: string;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotebookNote {
+  id: string;
+  workspace_id: string;
+  folder_id: string | null;
+  title: string;
+  body: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Activity {
   id: string;
   workspace_id: string;

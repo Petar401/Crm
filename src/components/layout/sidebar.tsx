@@ -8,6 +8,7 @@ import {
   Users,
   Briefcase,
   CheckSquare,
+  NotebookPen,
   FolderOpen,
   Settings,
   type LucideIcon,
@@ -39,6 +40,12 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: "/deals", label: "Deals", icon: Briefcase, permission: "deals.view" },
   { href: "/tasks", label: "Tasks", icon: CheckSquare, permission: "tasks.view" },
+  {
+    href: "/notes",
+    label: "Notes",
+    icon: NotebookPen,
+    permission: "notebook.view",
+  },
   { href: "/files", label: "Files", icon: FolderOpen, permission: "files.view" },
   {
     href: "/settings",
