@@ -7,6 +7,7 @@ import {
   NotebookPen,
   FolderOpen,
   Settings,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -51,6 +52,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Files",
     icon: FolderOpen,
     permission: "files.view",
+  },
+  {
+    href: "/aria",
+    label: "Aria",
+    icon: Sparkles,
+    permission: "ai.use",
   },
   {
     href: "/settings",
