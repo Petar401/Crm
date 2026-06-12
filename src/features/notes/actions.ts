@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
+import { notifyWorkspaceEvent } from "@/lib/notifications";
 
 export interface ActionResult {
   error?: string;
@@ -50,6 +51,15 @@ export async function createNote(values: unknown): Promise<ActionResult> {
     contactId: parsed.data.contact_id,
     dealId: parsed.data.deal_id,
   });
+
+  notifyWorkspaceEvent({
+    workspaceId: ctx.workspace.id,
+    creatorUserId: ctx.userId,
+    creatorName: ctx.profile?.full_name ?? ctx.email,
+    entityType: "note",
+    entityTitle: parsed.data.body.slice(0, 80),
+    workspaceName: ctx.workspace.name,
+  }).catch(() => {});
 
   revalidatePath("/", "layout");
   return {};
