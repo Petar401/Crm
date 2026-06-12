@@ -1,33 +1,38 @@
 import "server-only";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 
-const MODEL = "gemini-2.0-flash";
+const MODEL = "llama-3.3-70b-versatile";
 
-/** Whether AI features are configured (a Gemini key is present). */
+/** Whether AI features are configured (a Groq key is present). */
 export function isAiConfigured(): boolean {
-  return !!process.env.GEMINI_API_KEY;
+  return !!process.env.GROQ_API_KEY;
 }
 
 /**
- * Runs a single-turn Gemini generation server-side. Throws if AI is not
+ * Runs a single-turn generation server-side via Groq. Throws if AI is not
  * configured. The API key never leaves the server.
  */
 export async function generateText(
   prompt: string,
   systemInstruction?: string
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error("AI is not configured.");
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
+  const groq = new Groq({ apiKey });
+  const messages: Groq.Chat.ChatCompletionMessageParam[] = [];
+  if (systemInstruction) {
+    messages.push({ role: "system", content: systemInstruction });
+  }
+  messages.push({ role: "user", content: prompt });
+
+  const completion = await groq.chat.completions.create({
     model: MODEL,
-    systemInstruction,
+    messages,
   });
 
-  const result = await model.generateContent(prompt);
-  return result.response.text().trim();
+  return completion.choices[0].message.content?.trim() ?? "";
 }
