@@ -17,6 +17,8 @@ by pasting into the dashboard SQL editor.
 | `migrations/0007_autoconfirm_users.sql` | Auto-confirm new signups |
 | `migrations/0008_notebook.sql` | Shared Notebook: note folders + standalone notes, permissions, and RLS |
 | `migrations/0009_file_folders.sql` | Folders + workspace-level files for the Files manager |
+| `migrations/0010_shared_workspace.sql` | Consolidates all users/data into a single shared workspace |
+| `migrations/0011_lead_automation.sql` | Lead-finder campaigns + leads, RLS, permissions, and pg_cron/pg_net extensions |
 | `seed.sql` | Permission catalog rows (required) + default-role baseline |
 
 ## Apply with the Supabase CLI (recommended)
@@ -39,7 +41,7 @@ migrations and `seed.sql` automatically).
 ## Apply via the dashboard
 
 Open **SQL Editor** and run, in order: `0001` → `0002` → `0003` → `0004` →
-`0005` → `0006` → `0007` → `0008` → `0009`, then `seed.sql`.
+`0005` → `0006` → `0007` → `0008` → `0009` → `0010` → `0011`, then `seed.sql`.
 
 ## After applying
 
@@ -48,6 +50,27 @@ Open **SQL Editor** and run, in order: `0001` → `0002` → `0003` → `0004` �
 2. Copy your project URL and keys into `.env.local` (see `.env.example`).
 3. The `attachments` storage bucket is created by `0005_rls.sql` with private
    access; its policies scope objects by workspace.
+
+## Scheduling lead discovery (optional, free)
+
+The lead finder works on demand via the **Run now** button with no extra setup.
+To run campaigns automatically on their chosen frequency, schedule the secured
+route with **pg_cron** (free on all Supabase plans; `0011` enables the
+extensions). After deploying the app and setting `CRON_SECRET` in its
+environment, run this once in the SQL editor — replacing the URL and secret:
+
+```sql
+select cron.schedule('run-lead-campaigns', '0 * * * *', $$
+  select net.http_post(
+    url := 'https://YOUR_APP_URL/api/cron/leads',
+    headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET')
+  );
+$$);
+```
+
+It fires hourly; the route itself decides which campaigns are actually due
+(daily/weekly vs their last run), so one entry covers every frequency. To stop
+it later: `select cron.unschedule('run-lead-campaigns');`.
 
 ## How authorization works
 

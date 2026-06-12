@@ -38,6 +38,10 @@ export const PERMISSION_KEYS = [
   "settings.view",
   "settings.update",
   "ai.use",
+  "leads.view",
+  "leads.create",
+  "leads.update",
+  "leads.delete",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -134,6 +138,15 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     label: "AI",
     permissions: [{ key: "ai.use", description: "Use AI actions" }],
+  },
+  {
+    label: "Leads",
+    permissions: [
+      { key: "leads.view", description: "View campaigns & discovered leads" },
+      { key: "leads.create", description: "Create campaigns & run discovery" },
+      { key: "leads.update", description: "Edit campaigns & review leads" },
+      { key: "leads.delete", description: "Delete campaigns & leads" },
+    ],
   },
 ];
 

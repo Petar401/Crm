@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Settings,
   Sparkles,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,6 +36,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: "contacts.view",
   },
   { href: "/deals", label: "Deals", icon: Briefcase, permission: "deals.view" },
+  {
+    href: "/leads",
+    label: "Leads",
+    icon: Target,
+    permission: "leads.view",
+  },
   {
     href: "/tasks",
     label: "Tasks",

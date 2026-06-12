@@ -36,7 +36,11 @@ insert into public.permissions (key, description) values
   ('team.edit_roles',  'Edit roles & permissions'),
   ('settings.view',    'View settings'),
   ('settings.update',  'Update settings'),
-  ('ai.use',           'Use AI actions')
+  ('ai.use',           'Use AI actions'),
+  ('leads.view',       'View lead campaigns & discovered leads'),
+  ('leads.create',     'Create campaigns & run lead discovery'),
+  ('leads.update',     'Edit campaigns & review/approve leads'),
+  ('leads.delete',     'Delete campaigns & leads')
 on conflict (key) do update set description = excluded.description;
 
 -- Default role permissions template: grant a sensible read/write baseline to
@@ -56,6 +60,7 @@ where r.is_default
     'notes.view','notes.create','notes.update',
     'notebook.view','notebook.create','notebook.update',
     'files.view','files.upload',
-    'team.view','settings.view','ai.use'
+    'team.view','settings.view','ai.use',
+    'leads.view','leads.create','leads.update'
   )
 on conflict (role_id, permission_key) do nothing;

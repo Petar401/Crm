@@ -215,6 +215,59 @@ export interface Folder {
   updated_at: string;
 }
 
+export type CampaignFrequency = "manual" | "daily" | "weekly";
+export type LeadStatus = "pending" | "approved" | "rejected" | "converted";
+
+export interface LeadCampaign {
+  id: string;
+  workspace_id: string;
+  name: string;
+  business_description: string;
+  target_categories: string[];
+  location: string | null;
+  country: string | null;
+  frequency: CampaignFrequency;
+  auto_create: boolean;
+  max_results: number;
+  enabled: boolean;
+  last_run_at: string | null;
+  last_run_status: string | null;
+  last_run_count: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Lead {
+  id: string;
+  workspace_id: string;
+  campaign_id: string | null;
+  company_name: string;
+  website: string | null;
+  phone: string | null;
+  email: string | null;
+  address_line_1: string | null;
+  city: string | null;
+  country: string | null;
+  industry: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  job_title: string | null;
+  source: string;
+  source_ref: string | null;
+  match_score: number | null;
+  match_reason: string | null;
+  status: LeadStatus;
+  converted_company_id: string | null;
+  converted_contact_id: string | null;
+  raw: unknown;
+  created_by: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
 export interface Role {
   id: string;
   workspace_id: string;
