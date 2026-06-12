@@ -68,10 +68,12 @@ export async function signupAction(values: unknown): Promise<ActionResult> {
     }
   }
 
-  // Session active — create the workspace and owner membership.
-  const { error: rpcError } = await supabase.rpc("create_workspace_for_user", {
-    workspace_name: parsed.data.workspaceName,
-  });
+  // Session active — join the single shared workspace (the first user ever
+  // bootstraps it). Everyone shares the same companies, notes, files, etc.
+  const { error: rpcError } = await supabase.rpc(
+    "join_or_create_shared_workspace",
+    {}
+  );
   if (rpcError) return { error: rpcError.message };
 
   revalidatePath("/", "layout");
@@ -170,7 +172,11 @@ export async function signOutAction(): Promise<void> {
   redirect("/login");
 }
 
-/** Creates a workspace for an authenticated user who has none yet (onboarding). */
+/**
+ * Joins an authenticated user who has no workspace yet into the single shared
+ * workspace (onboarding fallback). The provided name is only used to name the
+ * workspace when this is the very first user and none exists yet.
+ */
 export async function createWorkspaceAction(
   workspaceName: string
 ): Promise<ActionResult> {
@@ -180,7 +186,7 @@ export async function createWorkspaceAction(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { error } = await supabase.rpc("create_workspace_for_user", {
+  const { error } = await supabase.rpc("join_or_create_shared_workspace", {
     workspace_name: workspaceName,
   });
   if (error) return { error: error.message };

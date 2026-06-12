@@ -23,7 +23,7 @@ export function SignupForm() {
 
   const form = useForm<SignupInput>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { fullName: "", workspaceName: "", email: "", password: "" },
+    defaultValues: { fullName: "", email: "", password: "" },
   });
 
   function onSubmit(values: SignupInput) {
@@ -45,19 +45,6 @@ export function SignupForm() {
               <FormLabel>Full name</FormLabel>
               <FormControl>
                 <Input placeholder="Jane Smith" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="workspaceName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Workspace name</FormLabel>
-              <FormControl>
-                <Input placeholder="East Anglia AI Services" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
