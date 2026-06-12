@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function getCrmContext(workspaceId: string): Promise<string> {
   const supabase = await createClient();
 
-  const [companies, contacts, deals, tasks, activities, notes] =
+  const [companies, contacts, deals, tasks, activities, notes, leads] =
     await Promise.all([
       supabase
         .from("companies")
@@ -41,6 +41,15 @@ export async function getCrmContext(workspaceId: string): Promise<string> {
         .select("title,body")
         .eq("workspace_id", workspaceId)
         .limit(50),
+      supabase
+        .from("leads")
+        .select(
+          "id,company_name,website,industry,city,country,contact_name,job_title,match_score,match_reason"
+        )
+        .eq("workspace_id", workspaceId)
+        .eq("status", "pending")
+        .order("match_score", { ascending: false, nullsFirst: false })
+        .limit(50),
     ]);
 
   return JSON.stringify({
@@ -50,5 +59,6 @@ export async function getCrmContext(workspaceId: string): Promise<string> {
     tasks: tasks.data ?? [],
     recentActivities: activities.data ?? [],
     notebookNotes: notes.data ?? [],
+    leads: leads.data ?? [],
   });
 }

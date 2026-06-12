@@ -5,7 +5,7 @@ import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { generateText, isAiConfigured } from "@/features/ai/gemini";
 import { logActivity } from "@/features/activities/log";
-import type { Deal } from "@/lib/db/types";
+import type { Deal, Lead } from "@/lib/db/types";
 
 export interface AiResult {
   text?: string;
@@ -24,7 +24,7 @@ async function authorizeAi(): Promise<AuthorizeResult> {
   if (!isAiConfigured()) {
     return {
       ok: false,
-      error: "AI is not configured. Add a GEMINI_API_KEY to enable it.",
+      error: "AI is not configured. Add a GROQ_API_KEY to enable it.",
     };
   }
   const ctx = await requireAuthContext();
@@ -117,6 +117,52 @@ export async function draftFollowUp(dealId: string): Promise<AiResult> {
       `Draft a short, friendly but professional follow-up email for this deal. ` +
         `Keep it under 120 words. Deal: ${deal.name}, value ${deal.value ?? "?"} ${deal.currency}, status ${deal.status}.` +
         (deal.next_step ? ` Planned next step: ${deal.next_step}.` : ""),
+      SYSTEM
+    );
+    return { text };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "AI request failed." };
+  }
+}
+
+export async function draftLeadEmail(leadId: string): Promise<AiResult> {
+  const auth = await authorizeAi();
+  if (!auth.ok) return { error: auth.error };
+
+  const supabase = await createClient();
+  const { data: lead } = await supabase
+    .from("leads")
+    .select("*")
+    .eq("id", leadId)
+    .eq("workspace_id", auth.ws)
+    .maybeSingle<Lead>();
+  if (!lead) return { error: "Lead not found." };
+
+  let businessDescription = "";
+  if (lead.campaign_id) {
+    const { data: campaign } = await supabase
+      .from("lead_campaigns")
+      .select("business_description")
+      .eq("id", lead.campaign_id)
+      .eq("workspace_id", auth.ws)
+      .maybeSingle<{ business_description: string }>();
+    businessDescription = campaign?.business_description ?? "";
+  }
+
+  try {
+    const text = await generateText(
+      `Draft a short, personalised cold-outreach email to this prospect. ` +
+        `Keep it under 120 words: a relevant hook, one line of value, and a soft call to action. ` +
+        `Do not invent facts about them.\n\n` +
+        (businessDescription ? `Our business: ${businessDescription}\n` : "") +
+        `Prospect: ${JSON.stringify({
+          company: lead.company_name,
+          industry: lead.industry,
+          city: lead.city,
+          website: lead.website,
+          contact: lead.contact_name,
+          role: lead.job_title,
+        })}`,
       SYSTEM
     );
     return { text };
