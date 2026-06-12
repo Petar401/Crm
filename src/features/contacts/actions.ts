@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
+import { notifyWorkspaceEvent } from "@/lib/notifications";
 import { contactSchema } from "@/features/contacts/schemas";
 
 export interface ActionResult {
@@ -44,6 +45,15 @@ export async function createContact(values: unknown): Promise<ActionResult> {
     companyId: parsed.data.company_id,
     contactId: data.id,
   });
+
+  notifyWorkspaceEvent({
+    workspaceId: ctx.workspace.id,
+    creatorUserId: ctx.userId,
+    creatorName: ctx.profile?.full_name ?? ctx.email,
+    entityType: "contact",
+    entityTitle: `${parsed.data.first_name} ${parsed.data.last_name}`,
+    workspaceName: ctx.workspace.name,
+  }).catch(() => {});
 
   revalidatePath("/contacts");
   return { id: data.id };

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
+import { notifyWorkspaceEvent } from "@/lib/notifications";
 import { dealSchema } from "@/features/deals/schemas";
 import type { DealInput } from "@/features/deals/schemas";
 
@@ -69,6 +70,15 @@ export async function createDeal(values: unknown): Promise<ActionResult> {
     companyId: parsed.data.company_id,
     dealId: data.id,
   });
+
+  notifyWorkspaceEvent({
+    workspaceId: ctx.workspace.id,
+    creatorUserId: ctx.userId,
+    creatorName: ctx.profile?.full_name ?? ctx.email,
+    entityType: "deal",
+    entityTitle: parsed.data.name,
+    workspaceName: ctx.workspace.name,
+  }).catch(() => {});
 
   revalidatePath("/deals");
   return { id: data.id };

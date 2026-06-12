@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
+import { notifyWorkspaceEvent } from "@/lib/notifications";
 import { companySchema } from "@/features/companies/schemas";
 
 export interface ActionResult {
@@ -43,6 +44,15 @@ export async function createCompany(values: unknown): Promise<ActionResult> {
     title: `Company created: ${parsed.data.name}`,
     companyId: data.id,
   });
+
+  notifyWorkspaceEvent({
+    workspaceId: ctx.workspace.id,
+    creatorUserId: ctx.userId,
+    creatorName: ctx.profile?.full_name ?? ctx.email,
+    entityType: "company",
+    entityTitle: parsed.data.name,
+    workspaceName: ctx.workspace.name,
+  }).catch(() => {});
 
   revalidatePath("/companies");
   return { id: data.id };

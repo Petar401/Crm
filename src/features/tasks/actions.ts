@@ -7,6 +7,7 @@ import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
 import { taskSchema, type TaskInput } from "@/features/tasks/schemas";
+import { notifyTaskCreated } from "@/lib/notifications";
 
 export interface ActionResult {
   error?: string;
@@ -59,6 +60,17 @@ export async function createTask(values: unknown): Promise<ActionResult> {
     dealId: row.deal_id,
     taskId: data.id,
   });
+
+  notifyTaskCreated({
+    workspaceId: ctx.workspace.id,
+    creatorUserId: ctx.userId,
+    creatorName: ctx.profile?.full_name ?? ctx.email,
+    taskTitle: parsed.data.title,
+    assignedToUserId: row.assigned_to,
+    workspaceName: ctx.workspace.name,
+    priority: parsed.data.priority,
+    dueAt: row.due_at,
+  }).catch(() => {});
 
   revalidatePath("/tasks");
   return { id: data.id };
