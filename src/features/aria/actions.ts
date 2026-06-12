@@ -1,12 +1,10 @@
 "use server";
 
-import type { Part } from "@google/generative-ai";
-
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { isAiConfigured } from "@/features/ai/gemini";
 import { runAriaChat } from "@/features/aria/gemini-chat";
-import type { GeminiHistoryItem } from "@/features/aria/gemini-chat";
+import type { GeminiHistoryItem, ChatPart } from "@/features/aria/gemini-chat";
 import { getCrmContext } from "@/features/aria/queries";
 
 export interface HistoryMessage {
@@ -32,7 +30,7 @@ export async function sendAriaMessage(
 ): Promise<AriaResult> {
   if (!isAiConfigured()) {
     return {
-      error: "AI is not configured. Add a GEMINI_API_KEY to enable Aria.",
+      error: "AI is not configured. Add a GROQ_API_KEY to enable Aria.",
     };
   }
 
@@ -65,7 +63,7 @@ export async function sendAriaMessage(
     parts: [{ text: m.content }],
   }));
 
-  const newParts: Part[] = [{ text: userMessage || "(see attached file)" }];
+  const newParts: ChatPart[] = [{ text: userMessage || "(see attached file)" }];
   if (attachments?.length) {
     for (const att of attachments) {
       newParts.push({
