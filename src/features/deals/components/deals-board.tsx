@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { DataToolbar, useDataView } from "@/components/shared/data-toolbar";
 import {
   Table,
   TableBody,
@@ -44,6 +45,61 @@ export function DealsBoard({
   const [view, setView] = useState<"board" | "table">("board");
   const [createOpen, setCreateOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+
+  const dv = useDataView<DealWithRelations>({
+    data: deals,
+    searchPlaceholder: "Search deals…",
+    searchAccessor: (d) => [d.name, d.company?.name, d.source],
+    filters: [
+      {
+        id: "status",
+        label: "All statuses",
+        accessor: (d) => d.status,
+        options: [
+          { value: "open", label: "Open" },
+          { value: "won", label: "Won" },
+          { value: "lost", label: "Lost" },
+        ],
+      },
+      {
+        id: "stage",
+        label: "All stages",
+        accessor: (d) => d.stage_id,
+        options: stages.map((s) => ({ value: s.id, label: s.name })),
+      },
+      {
+        id: "company",
+        label: "All companies",
+        accessor: (d) => d.company_id,
+        options: companies.map((c) => ({ value: c.id, label: c.name })),
+      },
+    ],
+    sorts: [
+      { id: "name", label: "Name", accessor: (d) => d.name, type: "text" },
+      { id: "value", label: "Value", accessor: (d) => d.value, type: "number" },
+      {
+        id: "expected_close_date",
+        label: "Close date",
+        accessor: (d) => d.expected_close_date,
+        type: "date",
+      },
+      {
+        id: "probability",
+        label: "Probability",
+        accessor: (d) => d.probability,
+        type: "number",
+      },
+      {
+        id: "created_at",
+        label: "Date added",
+        accessor: (d) => d.created_at,
+        type: "date",
+      },
+    ],
+    defaultSortId: "created_at",
+    defaultSortDir: "desc",
+  });
+  const filtered = dv.view;
 
   async function onDrop(stage: DealStage) {
     if (!dragId) return;
@@ -122,10 +178,14 @@ export function DealsBoard({
     <div>
       {header}
 
+      <div className="mb-4">
+        <DataToolbar controller={dv} />
+      </div>
+
       {view === "board" ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {stages.map((stage) => {
-            const stageDeals = deals.filter((d) => d.stage_id === stage.id);
+            const stageDeals = filtered.filter((d) => d.stage_id === stage.id);
             const total = stageDeals.reduce((s, d) => s + (d.value ?? 0), 0);
             return (
               <div
@@ -188,7 +248,7 @@ export function DealsBoard({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {deals.map((deal) => (
+              {filtered.map((deal) => (
                 <TableRow
                   key={deal.id}
                   className="cursor-pointer"

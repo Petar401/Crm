@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Mail, Sparkles, Target, X } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { draftLeadEmail } from "@/features/ai/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { DataToolbar, useDataView } from "@/components/shared/data-toolbar";
 import {
   Table,
   TableBody,
@@ -40,6 +41,57 @@ export function LeadsTable({ leads, canUpdate, aiEnabled }: LeadsTableProps) {
   const [draftLead, setDraftLead] = useState<Lead | null>(null);
   const [draftText, setDraftText] = useState("");
   const [draftLoading, setDraftLoading] = useState(false);
+
+  const industries = useMemo(
+    () =>
+      Array.from(
+        new Set(leads.map((l) => l.industry).filter((v): v is string => !!v))
+      ).sort((a, b) => a.localeCompare(b)),
+    [leads]
+  );
+
+  const dv = useDataView<Lead>({
+    data: leads,
+    searchPlaceholder: "Search leads…",
+    searchAccessor: (l) => [
+      l.company_name,
+      l.industry,
+      l.city,
+      l.contact_name,
+      l.email,
+    ],
+    filters: [
+      {
+        id: "industry",
+        label: "All types",
+        accessor: (l) => l.industry,
+        options: industries.map((i) => ({ value: i, label: i })),
+      },
+    ],
+    sorts: [
+      {
+        id: "match_score",
+        label: "Fit score",
+        accessor: (l) => l.match_score,
+        type: "number",
+      },
+      {
+        id: "company_name",
+        label: "Company",
+        accessor: (l) => l.company_name,
+        type: "text",
+      },
+      {
+        id: "created_at",
+        label: "Date added",
+        accessor: (l) => l.created_at,
+        type: "date",
+      },
+    ],
+    defaultSortId: "match_score",
+    defaultSortDir: "desc",
+  });
+  const filtered = dv.view;
 
   function handleApprove(lead: Lead) {
     setProcessingId(lead.id);
@@ -89,19 +141,29 @@ export function LeadsTable({ leads, canUpdate, aiEnabled }: LeadsTableProps) {
   }
 
   return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Company</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead>Location</TableHead>
-            <TableHead>Fit</TableHead>
-            <TableHead className="w-32" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {leads.map((lead) => (
+    <div className="space-y-4">
+      <DataToolbar controller={dv} />
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={Target}
+          title="No matches"
+          description="No leads match your search and filters."
+        />
+      ) : (
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Company</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Location</TableHead>
+                <TableHead>Fit</TableHead>
+                <TableHead className="w-32" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((lead) => (
             <TableRow key={lead.id}>
               <TableCell>
                 <div className="font-medium">{lead.company_name}</div>
@@ -184,10 +246,12 @@ export function LeadsTable({ leads, canUpdate, aiEnabled }: LeadsTableProps) {
                   )}
                 </div>
               </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <Dialog
         open={!!draftLead}

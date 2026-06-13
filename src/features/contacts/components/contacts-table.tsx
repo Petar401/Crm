@@ -9,10 +9,10 @@ import type { ContactWithCompany } from "@/features/contacts/queries";
 import { deleteContact } from "@/features/contacts/actions";
 import { ContactForm } from "@/features/contacts/components/contact-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DataToolbar, useDataView } from "@/components/shared/data-toolbar";
 import {
   Table,
   TableBody,
@@ -44,14 +44,63 @@ export function ContactsTable({
   canDelete,
 }: ContactsTableProps) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ContactWithCompany | null>(null);
   const [deleting, setDeleting] = useState<ContactWithCompany | null>(null);
 
-  const filtered = contacts.filter((c) =>
-    c.full_name.toLowerCase().includes(search.toLowerCase())
-  );
+  const dv = useDataView<ContactWithCompany>({
+    data: contacts,
+    searchPlaceholder: "Search contacts…",
+    searchAccessor: (c) => [c.full_name, c.email, c.job_title, c.company?.name],
+    filters: [
+      {
+        id: "role",
+        label: "All roles",
+        accessor: (c) => c.contact_role,
+        options: [
+          { value: "decision_maker", label: "Decision maker" },
+          { value: "influencer", label: "Influencer" },
+          { value: "admin", label: "Admin" },
+          { value: "other", label: "Other" },
+        ],
+      },
+      {
+        id: "company",
+        label: "All companies",
+        accessor: (c) => c.company_id,
+        options: companies.map((co) => ({ value: co.id, label: co.name })),
+      },
+    ],
+    sorts: [
+      {
+        id: "full_name",
+        label: "Name",
+        accessor: (c) => c.full_name,
+        type: "text",
+      },
+      {
+        id: "company",
+        label: "Company",
+        accessor: (c) => c.company?.name,
+        type: "text",
+      },
+      {
+        id: "job_title",
+        label: "Title",
+        accessor: (c) => c.job_title,
+        type: "text",
+      },
+      {
+        id: "created_at",
+        label: "Date added",
+        accessor: (c) => c.created_at,
+        type: "date",
+      },
+    ],
+    defaultSortId: "full_name",
+    defaultSortDir: "asc",
+  });
+  const filtered = dv.view;
 
   async function handleDelete() {
     if (!deleting) return;
@@ -65,22 +114,16 @@ export function ContactsTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <Input
-          placeholder="Search contacts…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
+      <DataToolbar controller={dv}>
         {canCreate && companies.length > 0 && (
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" />
             New contact
           </Button>
         )}
-      </div>
+      </DataToolbar>
 
-      {filtered.length === 0 ? (
+      {contacts.length === 0 ? (
         <EmptyState
           icon={Users}
           title="No contacts yet"
@@ -97,6 +140,12 @@ export function ContactsTable({
               </Button>
             ) : undefined
           }
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="No matches"
+          description="No contacts match your search and filters."
         />
       ) : (
         <div className="rounded-lg border">

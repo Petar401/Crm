@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -9,10 +9,10 @@ import type { Company } from "@/lib/db/types";
 import { deleteCompany } from "@/features/companies/actions";
 import { CompanyForm } from "@/features/companies/components/company-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DataToolbar, useDataView } from "@/components/shared/data-toolbar";
 import {
   Table,
   TableBody,
@@ -42,14 +42,70 @@ export function CompaniesTable({
   canDelete,
 }: CompaniesTableProps) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
   const [deleting, setDeleting] = useState<Company | null>(null);
 
-  const filtered = companies.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
+  // Business types (industries) present in the data drive the type filter.
+  const industries = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          companies.map((c) => c.industry).filter((v): v is string => !!v)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [companies]
   );
+
+  const dv = useDataView<Company>({
+    data: companies,
+    searchPlaceholder: "Search companies…",
+    searchAccessor: (c) => [c.name, c.industry, c.city, c.email],
+    filters: [
+      {
+        id: "status",
+        label: "All statuses",
+        accessor: (c) => c.status,
+        options: [
+          { value: "lead", label: "Lead" },
+          { value: "active", label: "Active" },
+          { value: "customer", label: "Customer" },
+          { value: "inactive", label: "Inactive" },
+        ],
+      },
+      {
+        id: "industry",
+        label: "All types",
+        accessor: (c) => c.industry,
+        options: industries.map((i) => ({ value: i, label: i })),
+      },
+    ],
+    sorts: [
+      { id: "name", label: "Name", accessor: (c) => c.name, type: "text" },
+      {
+        id: "created_at",
+        label: "Date added",
+        accessor: (c) => c.created_at,
+        type: "date",
+      },
+      {
+        id: "updated_at",
+        label: "Last updated",
+        accessor: (c) => c.updated_at,
+        type: "date",
+      },
+      {
+        id: "status",
+        label: "Status",
+        accessor: (c) => c.status,
+        type: "text",
+      },
+      { id: "city", label: "City", accessor: (c) => c.city, type: "text" },
+    ],
+    defaultSortId: "created_at",
+    defaultSortDir: "desc",
+  });
+  const filtered = dv.view;
 
   async function handleDelete() {
     if (!deleting) return;
@@ -63,22 +119,16 @@ export function CompaniesTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <Input
-          placeholder="Search companies…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
+      <DataToolbar controller={dv}>
         {canCreate && (
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" />
             New company
           </Button>
         )}
-      </div>
+      </DataToolbar>
 
-      {filtered.length === 0 ? (
+      {companies.length === 0 ? (
         <EmptyState
           icon={Building2}
           title="No companies yet"
@@ -91,6 +141,12 @@ export function CompaniesTable({
               </Button>
             ) : undefined
           }
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={Building2}
+          title="No matches"
+          description="No companies match your search and filters."
         />
       ) : (
         <div className="rounded-lg border">

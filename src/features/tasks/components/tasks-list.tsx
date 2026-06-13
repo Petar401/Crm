@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { DataToolbar, useDataView } from "@/components/shared/data-toolbar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +45,66 @@ export function TasksList({
   const [editing, setEditing] = useState<TaskWithRelations | null>(null);
   const [deleting, setDeleting] = useState<TaskWithRelations | null>(null);
 
+  const priorityRank: Record<string, number> = { low: 0, medium: 1, high: 2 };
+  const dv = useDataView<TaskWithRelations>({
+    data: tasks,
+    searchPlaceholder: "Search tasks…",
+    searchAccessor: (t) => [t.title, t.company?.name, t.assignee?.full_name],
+    filters: [
+      {
+        id: "status",
+        label: "All statuses",
+        accessor: (t) => t.status,
+        options: [
+          { value: "todo", label: "To do" },
+          { value: "in_progress", label: "In progress" },
+          { value: "done", label: "Done" },
+          { value: "cancelled", label: "Cancelled" },
+        ],
+      },
+      {
+        id: "priority",
+        label: "All priorities",
+        accessor: (t) => t.priority,
+        options: [
+          { value: "high", label: "High" },
+          { value: "medium", label: "Medium" },
+          { value: "low", label: "Low" },
+        ],
+      },
+      {
+        id: "assignee",
+        label: "All assignees",
+        accessor: (t) => t.assigned_to,
+        options: members.map((m) => ({ value: m.userId, label: m.name })),
+      },
+    ],
+    sorts: [
+      {
+        id: "due_at",
+        label: "Due date",
+        accessor: (t) => t.due_at,
+        type: "date",
+      },
+      {
+        id: "priority",
+        label: "Priority",
+        accessor: (t) => priorityRank[t.priority],
+        type: "number",
+      },
+      { id: "title", label: "Title", accessor: (t) => t.title, type: "text" },
+      {
+        id: "created_at",
+        label: "Date created",
+        accessor: (t) => t.created_at,
+        type: "date",
+      },
+    ],
+    defaultSortId: "due_at",
+    defaultSortDir: "asc",
+  });
+  const filtered = dv.view;
+
   async function toggle(task: TaskWithRelations, checked: boolean) {
     if (!canUpdate) return;
     const result = await setTaskStatus(task.id, checked ? "done" : "todo");
@@ -63,14 +124,14 @@ export function TasksList({
 
   return (
     <div className="space-y-4">
-      {canCreate && (
-        <div className="flex justify-end">
+      <DataToolbar controller={dv}>
+        {canCreate && (
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" />
             New task
           </Button>
-        </div>
-      )}
+        )}
+      </DataToolbar>
 
       {tasks.length === 0 ? (
         <EmptyState
@@ -86,9 +147,15 @@ export function TasksList({
             ) : undefined
           }
         />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={CheckSquare}
+          title="No matches"
+          description="No tasks match your search and filters."
+        />
       ) : (
         <div className="divide-y rounded-lg border">
-          {tasks.map((task) => {
+          {filtered.map((task) => {
             const done = task.status === "done";
             return (
               <div
