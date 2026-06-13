@@ -64,8 +64,12 @@ export function CampaignForm({
       frequency: campaign?.frequency ?? "manual",
       auto_create: campaign?.auto_create ?? false,
       max_results: campaign ? String(campaign.max_results) : "25",
+      run_hour: campaign ? String(campaign.run_hour) : "9",
+      min_score: campaign ? String(campaign.min_score) : "0",
     },
   });
+
+  const frequency = form.watch("frequency");
 
   function onSubmit(values: CampaignInput) {
     startTransition(async () => {
@@ -207,6 +211,52 @@ export function CampaignForm({
                     <FormControl>
                       <Input placeholder="25" inputMode="numeric" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {frequency !== "manual" && (
+                <FormField
+                  control={form.control}
+                  name="run_hour"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Run hour (UTC)</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || "9"}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Array.from({ length: 24 }, (_, h) => (
+                            <SelectItem key={h} value={String(h)}>
+                              {String(h).padStart(2, "0")}:00
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>When daily/weekly runs fire.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              <FormField
+                control={form.control}
+                name="min_score"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Minimum score</FormLabel>
+                    <FormControl>
+                      <Input placeholder="0" inputMode="numeric" {...field} />
+                    </FormControl>
+                    <FormDescription>Skip leads below this (0–100).</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

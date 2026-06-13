@@ -10,6 +10,7 @@ interface LogActivityParams {
   companyId?: string | null;
   contactId?: string | null;
   dealId?: string | null;
+  leadId?: string | null;
   taskId?: string | null;
 }
 
@@ -26,6 +27,7 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
       company_id: params.companyId ?? null,
       contact_id: params.contactId ?? null,
       deal_id: params.dealId ?? null,
+      lead_id: params.leadId ?? null,
       task_id: params.taskId ?? null,
     });
   } catch {

@@ -133,6 +133,36 @@ function emptyEnrichment(): Enrichment {
 }
 
 /**
+ * Deterministic 0–100 "point" score from how contactable / complete a lead is.
+ * Guarantees every lead is scored even when AI is unavailable. Signals: a
+ * website, an email, a phone, a known contact person, a street address, and a
+ * category all add points.
+ */
+function computeBaseScore(
+  business: OverpassBusiness,
+  enriched: Enrichment
+): number {
+  let score = 20; // baseline for being a named, matched business
+  if (business.website) score += 25;
+  if (enriched.contactEmail ?? business.email) score += 20;
+  if (business.phone) score += 15;
+  if (enriched.contactName) score += 10;
+  if (business.street) score += 5;
+  if (business.category) score += 5;
+  return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Final score: when the AI returned a fit score, blend it with the
+ * contactability base so reachable leads still rank; otherwise fall back to the
+ * base score alone.
+ */
+function finalScore(aiScore: number | null, baseScore: number): number {
+  if (aiScore == null) return baseScore;
+  return Math.round(aiScore * 0.7 + baseScore * 0.3);
+}
+
+/**
  * Run a single campaign: discover businesses, dedupe, AI-score/enrich, then
  * either queue leads for review or auto-create Company (+ Contact) records.
  * Accepts the Supabase client so it works from both an RLS-aware server action
@@ -196,6 +226,16 @@ export async function runCampaign(
     const siteText = await fetchSiteText(business.website);
     const enriched = await scoreAndEnrich(business, campaign, siteText);
 
+    const baseScore = computeBaseScore(business, enriched);
+    const score = finalScore(enriched.score, baseScore);
+    // Skip leads below the campaign's minimum score threshold.
+    if (score < (campaign.min_score ?? 0)) continue;
+    const reason =
+      enriched.reason ??
+      (enriched.score == null
+        ? "Scored on available contact details (AI scoring disabled)."
+        : null);
+
     const contactEmail = enriched.contactEmail ?? business.email;
     const base = {
       workspace_id: campaign.workspace_id,
@@ -214,8 +254,9 @@ export async function runCampaign(
       job_title: enriched.jobTitle,
       source: "openstreetmap",
       source_ref: business.osmId,
-      match_score: enriched.score,
-      match_reason: enriched.reason,
+      match_score: score,
+      match_reason: reason,
+      owner_user_id: actorUserId,
       created_by: actorUserId,
       raw: business as unknown as Record<string, unknown>,
     };

@@ -157,10 +157,15 @@ export function CampaignsList({
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <Badge variant="secondary" className="capitalize">
                     {campaign.frequency}
+                    {campaign.frequency !== "manual" &&
+                      ` · ${String(campaign.run_hour).padStart(2, "0")}:00 UTC`}
                   </Badge>
                   <Badge variant="outline">
                     {campaign.auto_create ? "Auto-create" : "Review queue"}
                   </Badge>
+                  {campaign.min_score > 0 && (
+                    <Badge variant="outline">Min score {campaign.min_score}</Badge>
+                  )}
                   {campaign.last_run_at && (
                     <span className="text-muted-foreground">
                       Last run:{" "}
