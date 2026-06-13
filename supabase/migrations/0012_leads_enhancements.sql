@@ -38,7 +38,7 @@ create index if not exists activities_lead_idx on public.activities(lead_id);
 -- Extend the attachments entity_type check to allow 'lead' (same move 0009
 -- used to add 'workspace').
 alter table public.attachments
-  drop constraint attachments_entity_type_check;
+  drop constraint if exists attachments_entity_type_check;
 alter table public.attachments
   add constraint attachments_entity_type_check
   check (entity_type in ('company','contact','deal','note','workspace','lead'));
