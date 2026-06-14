@@ -16,7 +16,12 @@ import { StickyNote } from "lucide-react";
 
 interface NotesPanelProps {
   notes: Note[];
-  entity: { companyId?: string; contactId?: string; dealId?: string };
+  entity: {
+    companyId?: string;
+    contactId?: string;
+    dealId?: string;
+    leadId?: string;
+  };
   canCreate: boolean;
   canDelete: boolean;
   aiEnabled: boolean;
@@ -43,6 +48,7 @@ export function NotesPanel({
         company_id: entity.companyId,
         contact_id: entity.contactId,
         deal_id: entity.dealId,
+        lead_id: entity.leadId,
       });
       if (result.error) toast.error(result.error);
       else {

@@ -17,6 +17,7 @@ const noteSchema = z.object({
   company_id: z.string().uuid().optional(),
   contact_id: z.string().uuid().optional(),
   deal_id: z.string().uuid().optional(),
+  lead_id: z.string().uuid().optional(),
 });
 
 export async function createNote(values: unknown): Promise<ActionResult> {
@@ -34,6 +35,7 @@ export async function createNote(values: unknown): Promise<ActionResult> {
     company_id: parsed.data.company_id ?? null,
     contact_id: parsed.data.contact_id ?? null,
     deal_id: parsed.data.deal_id ?? null,
+    lead_id: parsed.data.lead_id ?? null,
     workspace_id: ctx.workspace.id,
     created_by: ctx.userId,
   });
@@ -49,6 +51,7 @@ export async function createNote(values: unknown): Promise<ActionResult> {
     companyId: parsed.data.company_id,
     contactId: parsed.data.contact_id,
     dealId: parsed.data.deal_id,
+    leadId: parsed.data.lead_id,
   });
 
   revalidatePath("/", "layout");

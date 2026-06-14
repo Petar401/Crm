@@ -23,7 +23,8 @@ export type EntityType =
   | "contact"
   | "deal"
   | "note"
-  | "workspace";
+  | "workspace"
+  | "lead";
 
 export interface Profile {
   id: string;
@@ -151,6 +152,7 @@ export interface Note {
   company_id: string | null;
   contact_id: string | null;
   deal_id: string | null;
+  lead_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -185,6 +187,7 @@ export interface Activity {
   company_id: string | null;
   contact_id: string | null;
   deal_id: string | null;
+  lead_id: string | null;
   task_id: string | null;
   actor_user_id: string | null;
   created_at: string;
@@ -229,6 +232,8 @@ export interface LeadCampaign {
   frequency: CampaignFrequency;
   auto_create: boolean;
   max_results: number;
+  run_hour: number;
+  min_score: number;
   enabled: boolean;
   last_run_at: string | null;
   last_run_status: string | null;
@@ -262,10 +267,12 @@ export interface Lead {
   converted_company_id: string | null;
   converted_contact_id: string | null;
   raw: unknown;
+  owner_user_id: string | null;
   created_by: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Role {

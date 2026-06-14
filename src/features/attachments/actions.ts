@@ -14,7 +14,14 @@ export interface ActionResult {
 }
 
 const metadataSchema = z.object({
-  entity_type: z.enum(["company", "contact", "deal", "note", "workspace"]),
+  entity_type: z.enum([
+    "company",
+    "contact",
+    "deal",
+    "note",
+    "workspace",
+    "lead",
+  ]),
   entity_id: z.string().uuid(),
   file_name: z.string().min(1),
   storage_path: z.string().min(1),
@@ -62,6 +69,7 @@ export async function recordAttachment(values: unknown): Promise<ActionResult> {
     companyId: parsed.data.entity_type === "company" ? parsed.data.entity_id : undefined,
     contactId: parsed.data.entity_type === "contact" ? parsed.data.entity_id : undefined,
     dealId: parsed.data.entity_type === "deal" ? parsed.data.entity_id : undefined,
+    leadId: parsed.data.entity_type === "lead" ? parsed.data.entity_id : undefined,
   });
 
   revalidatePath("/", "layout");
