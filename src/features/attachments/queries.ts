@@ -56,6 +56,22 @@ export async function getAllAttachments(
   return withSignedUrls((data ?? []) as Attachment[]);
 }
 
+/** Attachment records for the given ids within a workspace (no signed URLs). */
+export async function getAttachmentsByIds(
+  workspaceId: string,
+  ids: string[]
+): Promise<Attachment[]> {
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("attachments")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .in("id", ids);
+
+  return (data ?? []) as Attachment[];
+}
+
 /** All folders in a workspace (used to build the tree and breadcrumbs). */
 export async function getFolders(workspaceId: string): Promise<Folder[]> {
   const supabase = await createClient();
