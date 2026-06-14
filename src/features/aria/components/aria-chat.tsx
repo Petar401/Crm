@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Bot, Paperclip, Send, Sparkles, X } from "lucide-react";
+import {
+  Bot,
+  Check,
+  Copy,
+  Paperclip,
+  Plus,
+  RefreshCw,
+  Send,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -11,6 +21,7 @@ import {
 } from "@/features/aria/actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Markdown } from "@/components/shared/markdown";
 
 interface ChatAttachment {
   name: string;
@@ -75,6 +86,14 @@ export function AriaChat({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Auto-grow the textarea up to its max height as the user types.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
+
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
@@ -105,6 +124,42 @@ export function AriaChat({
 
   function removePendingFile(index: number) {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  /**
+   * Sends a turn to Aria. `history` is the settled conversation that precedes
+   * this turn; a loading bubble is appended and resolved in place.
+   */
+  function runTurn(
+    history: HistoryMessage[],
+    text: string,
+    attachmentInputs: AttachmentInput[]
+  ) {
+    setIsLoading(true);
+
+    startTransition(async () => {
+      const result = await sendAriaMessage(history, text, attachmentInputs);
+
+      if (result.error) {
+        toast.error(result.error);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.loading
+              ? { ...m, loading: false, error: true, content: result.error! }
+              : m
+          )
+        );
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.loading
+              ? { ...m, loading: false, content: result.message ?? "" }
+              : m
+          )
+        );
+      }
+      setIsLoading(false);
+    });
   }
 
   async function handleSend() {
@@ -138,37 +193,50 @@ export function AriaChat({
       loading: true,
     };
 
-    setMessages((prev) => [...prev, userMsg, loadingMsg]);
-    setInput("");
-    setPendingFiles([]);
-    setIsLoading(true);
-
-    // history = all prior settled messages; userMsg is the current turn sent via sendAriaMessage
+    // history = all prior settled messages; userMsg is the current turn
     const history: HistoryMessage[] = messages
       .filter((m) => !m.loading && !m.error)
       .map((m) => ({ role: m.role, content: m.content }));
 
-    startTransition(async () => {
-      const result = await sendAriaMessage(history, text, attachmentInputs);
+    setMessages((prev) => [...prev, userMsg, loadingMsg]);
+    setInput("");
+    setPendingFiles([]);
 
-      if (result.error) {
-        toast.error(result.error);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.loading ? { ...m, loading: false, error: true, content: result.error! } : m
-          )
-        );
-      } else {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.loading
-              ? { ...m, loading: false, content: result.message ?? "" }
-              : m
-          )
-        );
-      }
-      setIsLoading(false);
-    });
+    runTurn(history, text, attachmentInputs);
+  }
+
+  /** Re-asks Aria for the most recent user turn, replacing the last reply. */
+  function handleRegenerate() {
+    if (isLoading) return;
+    // Find the last user message and drop everything after it.
+    const lastUserIdx = [...messages]
+      .map((m) => m.role)
+      .lastIndexOf("user");
+    if (lastUserIdx === -1) return;
+
+    const lastUser = messages[lastUserIdx];
+    const history: HistoryMessage[] = messages
+      .slice(0, lastUserIdx)
+      .filter((m) => !m.loading && !m.error)
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    const loadingMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "model",
+      content: "",
+      loading: true,
+    };
+
+    setMessages([...messages.slice(0, lastUserIdx + 1), loadingMsg]);
+    // Attachments aren't re-sent on regenerate (originals aren't retained).
+    runTurn(history, lastUser.content, []);
+  }
+
+  function handleNewChat() {
+    if (isLoading) return;
+    setMessages([]);
+    setInput("");
+    setPendingFiles([]);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -189,7 +257,7 @@ export function AriaChat({
         <div>
           <p className="font-medium">Aria is not available</p>
           <p className="text-muted-foreground mt-1 text-sm">
-            Either the Gemini API key is not configured or you don&apos;t have
+            Either the AI service is not configured or you don&apos;t have
             permission to use AI features.
           </p>
         </div>
@@ -197,8 +265,31 @@ export function AriaChat({
     );
   }
 
+  const lastModelIdx = [...messages].map((m) => m.role).lastIndexOf("model");
+
   return (
     <div className="flex h-full flex-col rounded-lg border">
+      {/* Header */}
+      {messages.length > 0 && (
+        <div className="flex items-center justify-between border-b px-4 py-2">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
+            <Sparkles className="text-primary size-3.5" />
+            Aria
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1.5 text-xs"
+            disabled={isLoading}
+            onClick={handleNewChat}
+          >
+            <Plus className="size-3.5" />
+            New chat
+          </Button>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4">
         {messages.length === 0 ? (
@@ -234,8 +325,15 @@ export function AriaChat({
           </div>
         ) : (
           <div className="space-y-4">
-            {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+            {messages.map((msg, idx) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                canRegenerate={
+                  !isLoading && idx === lastModelIdx && !msg.loading
+                }
+                onRegenerate={handleRegenerate}
+              />
             ))}
             <div ref={messagesEndRef} />
           </div>
@@ -318,8 +416,24 @@ export function AriaChat({
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({
+  message,
+  canRegenerate = false,
+  onRegenerate,
+}: {
+  message: ChatMessage;
+  canRegenerate?: boolean;
+  onRegenerate?: () => void;
+}) {
   const isUser = message.role === "user";
+  const [copied, setCopied] = useState(false);
+
+  function copy() {
+    if (!message.content) return;
+    navigator.clipboard.writeText(message.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   if (isUser) {
     return (
@@ -369,15 +483,47 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             </div>
           </div>
         ) : (
-          <div
-            className={`w-fit max-w-[90%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm ${
-              message.error
-                ? "bg-destructive/10 text-destructive border border-destructive/20"
-                : "bg-muted"
-            }`}
-          >
-            <p className="whitespace-pre-wrap">{message.content}</p>
-          </div>
+          <>
+            <div
+              className={`w-fit max-w-[90%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm ${
+                message.error
+                  ? "bg-destructive/10 text-destructive border border-destructive/20"
+                  : "bg-muted"
+              }`}
+            >
+              {message.error ? (
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              ) : (
+                <Markdown content={message.content} />
+              )}
+            </div>
+            {!message.error && message.content && (
+              <div className="mt-1.5 flex items-center gap-1">
+                <button
+                  onClick={copy}
+                  title="Copy"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors"
+                >
+                  {copied ? (
+                    <Check className="size-3" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+                {canRegenerate && onRegenerate && (
+                  <button
+                    onClick={onRegenerate}
+                    title="Regenerate"
+                    className="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors"
+                  >
+                    <RefreshCw className="size-3" />
+                    Regenerate
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
