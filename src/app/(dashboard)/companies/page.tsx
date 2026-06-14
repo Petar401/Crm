@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
 import { getCompanies } from "@/features/companies/queries";
+import { getMemberOptions } from "@/features/team/queries";
 import { CompaniesTable } from "@/features/companies/components/companies-table";
 import { PageHeader } from "@/components/shared/page-header";
 
@@ -14,7 +15,10 @@ export default async function CompaniesPage() {
 
   if (!allowed.has("companies.view")) redirect("/");
 
-  const companies = await getCompanies(ctx.workspace.id);
+  const [companies, members] = await Promise.all([
+    getCompanies(ctx.workspace.id),
+    getMemberOptions(ctx.workspace.id),
+  ]);
 
   return (
     <div>
@@ -24,6 +28,7 @@ export default async function CompaniesPage() {
       />
       <CompaniesTable
         companies={companies}
+        members={members}
         canCreate={allowed.has("companies.create")}
         canUpdate={allowed.has("companies.update")}
         canDelete={allowed.has("companies.delete")}

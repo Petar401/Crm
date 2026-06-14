@@ -13,11 +13,13 @@ import {
 import { getNotes } from "@/features/notes/queries";
 import { getEntityAttachments } from "@/features/attachments/queries";
 import { getEntityActivities } from "@/features/activities/queries";
+import { getMemberOptions } from "@/features/team/queries";
+import { getStages } from "@/features/deals/queries";
 import { formatCurrency } from "@/lib/utils/format";
 import { CompanyDetailTabs } from "@/features/companies/components/company-detail-tabs";
+import { CompanyDetailActions } from "@/features/companies/components/company-detail-actions";
 import { AiPanel } from "@/features/ai/components/ai-panel";
 import { PageHeader } from "@/components/shared/page-header";
-import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -36,13 +38,16 @@ export default async function CompanyDetailPage({
   const company = await getCompany(ctx.workspace.id, id);
   if (!company) notFound();
 
-  const [contacts, deals, notes, attachments, activities] = await Promise.all([
-    getCompanyContacts(ctx.workspace.id, id),
-    getCompanyDeals(ctx.workspace.id, id),
-    getNotes(ctx.workspace.id, { companyId: id }),
-    getEntityAttachments(ctx.workspace.id, "company", id),
-    getEntityActivities(ctx.workspace.id, { companyId: id }),
-  ]);
+  const [contacts, deals, notes, attachments, activities, members, stages] =
+    await Promise.all([
+      getCompanyContacts(ctx.workspace.id, id),
+      getCompanyDeals(ctx.workspace.id, id),
+      getNotes(ctx.workspace.id, { companyId: id }),
+      getEntityAttachments(ctx.workspace.id, "company", id),
+      getEntityActivities(ctx.workspace.id, { companyId: id }),
+      getMemberOptions(ctx.workspace.id),
+      getStages(ctx.workspace.id),
+    ]);
 
   const aiEnabled = isAiConfigured() && allowed.has("ai.use");
 
@@ -58,7 +63,14 @@ export default async function CompanyDetailPage({
       <PageHeader
         title={company.name}
         description={company.industry ?? undefined}
-        action={<StatusBadge status={company.status} />}
+        action={
+          <CompanyDetailActions
+            company={company}
+            members={members}
+            canUpdate={allowed.has("companies.update")}
+            canDelete={allowed.has("companies.delete")}
+          />
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -70,12 +82,15 @@ export default async function CompanyDetailPage({
             notes={notes}
             attachments={attachments}
             activities={activities}
+            stages={stages}
             workspaceId={ctx.workspace.id}
             permissions={{
               notesCreate: allowed.has("notes.create"),
               notesDelete: allowed.has("notes.delete"),
               filesUpload: allowed.has("files.upload"),
               filesDelete: allowed.has("files.delete"),
+              contactsCreate: allowed.has("contacts.create"),
+              dealsCreate: allowed.has("deals.create"),
             }}
             aiEnabled={aiEnabled}
           />

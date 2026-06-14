@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
-import { companySchema } from "@/features/companies/schemas";
+import { companySchema, companyStatuses } from "@/features/companies/schemas";
 
 export interface ActionResult {
   error?: string;
@@ -68,6 +68,68 @@ export async function updateCompany(
     .eq("workspace_id", ctx.workspace.id);
 
   if (error) return { error: error.message };
+
+  revalidatePath("/companies");
+  revalidatePath(`/companies/${id}`);
+  return { id };
+}
+
+export async function updateCompanyStatus(
+  id: string,
+  status: string
+): Promise<ActionResult> {
+  if (!companyStatuses.includes(status as (typeof companyStatuses)[number])) {
+    return { error: "Invalid status" };
+  }
+
+  const ctx = await requireAuthContext();
+  await requirePermission("companies.update");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("companies")
+    .update({ status })
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspace.id);
+
+  if (error) return { error: error.message };
+
+  await logActivity({
+    workspaceId: ctx.workspace.id,
+    actorUserId: ctx.userId,
+    type: "note",
+    title: `Company status changed to ${status}`,
+    companyId: id,
+  });
+
+  revalidatePath("/companies");
+  revalidatePath(`/companies/${id}`);
+  return { id };
+}
+
+export async function reassignCompany(
+  id: string,
+  ownerUserId: string | null
+): Promise<ActionResult> {
+  const ctx = await requireAuthContext();
+  await requirePermission("companies.update");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("companies")
+    .update({ owner_user_id: ownerUserId })
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspace.id);
+
+  if (error) return { error: error.message };
+
+  await logActivity({
+    workspaceId: ctx.workspace.id,
+    actorUserId: ctx.userId,
+    type: "note",
+    title: "Company owner reassigned",
+    companyId: id,
+  });
 
   revalidatePath("/companies");
   revalidatePath(`/companies/${id}`);

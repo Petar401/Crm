@@ -1,14 +1,32 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Company, Contact, Deal } from "@/lib/db/types";
 
-export async function getCompanies(workspaceId: string): Promise<Company[]> {
+export interface CompanyListItem extends Company {
+  contactCount: number;
+  openDealsValue: number;
+}
+
+export async function getCompanies(
+  workspaceId: string
+): Promise<CompanyListItem[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("companies")
-    .select("*")
+    .select("*, contacts(count), deals(value, status)")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
-  return (data ?? []) as Company[];
+
+  return (data ?? []).map((row) => {
+    const { contacts, deals, ...company } = row as Company & {
+      contacts: { count: number }[] | null;
+      deals: { value: number | null; status: string }[] | null;
+    };
+    const contactCount = contacts?.[0]?.count ?? 0;
+    const openDealsValue = (deals ?? [])
+      .filter((d) => d.status === "open")
+      .reduce((sum, d) => sum + (d.value ?? 0), 0);
+    return { ...company, contactCount, openDealsValue } as CompanyListItem;
+  });
 }
 
 export async function getCompany(

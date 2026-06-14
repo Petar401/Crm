@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 
 import type {
@@ -7,6 +8,7 @@ import type {
   Company,
   Contact,
   Deal,
+  DealStage,
   Note,
 } from "@/lib/db/types";
 import type { AttachmentWithUrl } from "@/features/attachments/queries";
@@ -14,10 +16,13 @@ import { formatCurrency } from "@/lib/utils/format";
 import { NotesPanel } from "@/features/notes/components/notes-panel";
 import { FilesPanel } from "@/features/attachments/components/files-panel";
 import { ActivityTimeline } from "@/features/activities/components/activity-timeline";
+import { ContactForm } from "@/features/contacts/components/contact-form";
+import { DealForm } from "@/features/deals/components/deal-form";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Briefcase } from "lucide-react";
+import { Users, Briefcase, Plus } from "lucide-react";
 
 interface Props {
   company: Company;
@@ -26,12 +31,15 @@ interface Props {
   notes: Note[];
   attachments: AttachmentWithUrl[];
   activities: Activity[];
+  stages: DealStage[];
   workspaceId: string;
   permissions: {
     notesCreate: boolean;
     notesDelete: boolean;
     filesUpload: boolean;
     filesDelete: boolean;
+    contactsCreate: boolean;
+    dealsCreate: boolean;
   };
   aiEnabled: boolean;
 }
@@ -43,10 +51,21 @@ export function CompanyDetailTabs({
   notes,
   attachments,
   activities,
+  stages,
   workspaceId,
   permissions,
   aiEnabled,
 }: Props) {
+  const [addingContact, setAddingContact] = useState(false);
+  const [addingDeal, setAddingDeal] = useState(false);
+
+  const companyOption = [{ id: company.id, name: company.name }];
+  const contactOptions = contacts.map((c) => ({
+    id: c.id,
+    full_name: c.full_name,
+    company_id: c.company_id,
+  }));
+
   return (
     <Tabs defaultValue="contacts">
       <TabsList>
@@ -58,6 +77,14 @@ export function CompanyDetailTabs({
       </TabsList>
 
       <TabsContent value="contacts" className="pt-4">
+        {permissions.contactsCreate && (
+          <div className="mb-3 flex justify-end">
+            <Button size="sm" variant="outline" onClick={() => setAddingContact(true)}>
+              <Plus className="size-4" />
+              Add contact
+            </Button>
+          </div>
+        )}
         {contacts.length === 0 ? (
           <EmptyState icon={Users} title="No contacts" />
         ) : (
@@ -81,9 +108,25 @@ export function CompanyDetailTabs({
             ))}
           </div>
         )}
+        {permissions.contactsCreate && (
+          <ContactForm
+            open={addingContact}
+            onOpenChange={setAddingContact}
+            companies={companyOption}
+            defaultCompanyId={company.id}
+          />
+        )}
       </TabsContent>
 
       <TabsContent value="deals" className="pt-4">
+        {permissions.dealsCreate && stages.length > 0 && (
+          <div className="mb-3 flex justify-end">
+            <Button size="sm" variant="outline" onClick={() => setAddingDeal(true)}>
+              <Plus className="size-4" />
+              New deal
+            </Button>
+          </div>
+        )}
         {deals.length === 0 ? (
           <EmptyState icon={Briefcase} title="No deals" />
         ) : (
@@ -104,6 +147,16 @@ export function CompanyDetailTabs({
               </Link>
             ))}
           </div>
+        )}
+        {permissions.dealsCreate && stages.length > 0 && (
+          <DealForm
+            open={addingDeal}
+            onOpenChange={setAddingDeal}
+            companies={companyOption}
+            contacts={contactOptions}
+            stages={stages}
+            defaultCompanyId={company.id}
+          />
         )}
       </TabsContent>
 
