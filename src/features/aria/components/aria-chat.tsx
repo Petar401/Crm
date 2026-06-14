@@ -5,6 +5,8 @@ import {
   Bot,
   Check,
   Copy,
+  FolderOpen,
+  Loader2,
   Paperclip,
   Plus,
   RefreshCw,
@@ -15,13 +17,22 @@ import {
 import { toast } from "sonner";
 
 import {
+  listWorkspaceFilesForAria,
   sendAriaMessage,
   type AttachmentInput,
   type HistoryMessage,
+  type WorkspaceFileOption,
 } from "@/features/aria/actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Markdown } from "@/components/shared/markdown";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ChatAttachment {
   name: string;
@@ -76,6 +87,14 @@ export function AriaChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [selectedWorkspaceFiles, setSelectedWorkspaceFiles] = useState<
+    WorkspaceFileOption[]
+  >([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileOption[]>(
+    []
+  );
+  const [loadingFiles, setLoadingFiles] = useState(false);
   const [, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -126,6 +145,31 @@ export function AriaChat({
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  async function openPicker() {
+    setPickerOpen(true);
+    setLoadingFiles(true);
+    try {
+      const files = await listWorkspaceFilesForAria();
+      setWorkspaceFiles(files);
+    } catch {
+      toast.error("Couldn't load workspace files.");
+    } finally {
+      setLoadingFiles(false);
+    }
+  }
+
+  function toggleWorkspaceFile(file: WorkspaceFileOption) {
+    setSelectedWorkspaceFiles((prev) =>
+      prev.some((f) => f.id === file.id)
+        ? prev.filter((f) => f.id !== file.id)
+        : [...prev, file]
+    );
+  }
+
+  function removeWorkspaceFile(id: string) {
+    setSelectedWorkspaceFiles((prev) => prev.filter((f) => f.id !== id));
+  }
+
   /**
    * Sends a turn to Aria. `history` is the settled conversation that precedes
    * this turn; a loading bubble is appended and resolved in place.
@@ -133,12 +177,18 @@ export function AriaChat({
   function runTurn(
     history: HistoryMessage[],
     text: string,
-    attachmentInputs: AttachmentInput[]
+    attachmentInputs: AttachmentInput[],
+    workspaceFileIds: string[]
   ) {
     setIsLoading(true);
 
     startTransition(async () => {
-      const result = await sendAriaMessage(history, text, attachmentInputs);
+      const result = await sendAriaMessage(
+        history,
+        text,
+        attachmentInputs,
+        workspaceFileIds
+      );
 
       if (result.error) {
         toast.error(result.error);
@@ -164,20 +214,29 @@ export function AriaChat({
 
   async function handleSend() {
     const text = input.trim();
-    if (!text && pendingFiles.length === 0) return;
+    if (!text && pendingFiles.length === 0 && selectedWorkspaceFiles.length === 0)
+      return;
     if (isLoading) return;
 
-    const attachments: ChatAttachment[] = pendingFiles.map((pf) => ({
-      name: pf.file.name,
-      mimeType: pf.file.type,
-      previewUrl: pf.previewUrl,
-    }));
+    const attachments: ChatAttachment[] = [
+      ...pendingFiles.map((pf) => ({
+        name: pf.file.name,
+        mimeType: pf.file.type,
+        previewUrl: pf.previewUrl,
+      })),
+      ...selectedWorkspaceFiles.map((wf) => ({
+        name: wf.name,
+        mimeType: wf.mimeType ?? "",
+      })),
+    ];
 
     const attachmentInputs: AttachmentInput[] = pendingFiles.map((pf) => ({
       data: pf.base64,
       mimeType: pf.file.type,
       name: pf.file.name,
     }));
+
+    const workspaceFileIds = selectedWorkspaceFiles.map((f) => f.id);
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -201,8 +260,9 @@ export function AriaChat({
     setMessages((prev) => [...prev, userMsg, loadingMsg]);
     setInput("");
     setPendingFiles([]);
+    setSelectedWorkspaceFiles([]);
 
-    runTurn(history, text, attachmentInputs);
+    runTurn(history, text, attachmentInputs, workspaceFileIds);
   }
 
   /** Re-asks Aria for the most recent user turn, replacing the last reply. */
@@ -229,7 +289,7 @@ export function AriaChat({
 
     setMessages([...messages.slice(0, lastUserIdx + 1), loadingMsg]);
     // Attachments aren't re-sent on regenerate (originals aren't retained).
-    runTurn(history, lastUser.content, []);
+    runTurn(history, lastUser.content, [], []);
   }
 
   function handleNewChat() {
@@ -237,6 +297,7 @@ export function AriaChat({
     setMessages([]);
     setInput("");
     setPendingFiles([]);
+    setSelectedWorkspaceFiles([]);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -246,7 +307,11 @@ export function AriaChat({
     }
   }
 
-  const canSend = !isLoading && (input.trim().length > 0 || pendingFiles.length > 0);
+  const canSend =
+    !isLoading &&
+    (input.trim().length > 0 ||
+      pendingFiles.length > 0 ||
+      selectedWorkspaceFiles.length > 0);
 
   if (!aiEnabled) {
     return (
@@ -341,11 +406,11 @@ export function AriaChat({
       </div>
 
       {/* Pending file chips */}
-      {pendingFiles.length > 0 && (
+      {(pendingFiles.length > 0 || selectedWorkspaceFiles.length > 0) && (
         <div className="flex flex-wrap gap-2 border-t px-4 py-2">
           {pendingFiles.map((pf, i) => (
             <div
-              key={i}
+              key={`pf-${i}`}
               className="bg-muted flex items-center gap-1.5 rounded-md px-2 py-1 text-xs"
             >
               {pf.previewUrl ? (
@@ -361,6 +426,21 @@ export function AriaChat({
               <span className="max-w-[120px] truncate">{pf.file.name}</span>
               <button
                 onClick={() => removePendingFile(i)}
+                className="text-muted-foreground hover:text-foreground ml-0.5"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          ))}
+          {selectedWorkspaceFiles.map((wf) => (
+            <div
+              key={`wf-${wf.id}`}
+              className="bg-muted flex items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+            >
+              <FolderOpen className="size-3" />
+              <span className="max-w-[120px] truncate">{wf.name}</span>
+              <button
+                onClick={() => removeWorkspaceFile(wf.id)}
                 className="text-muted-foreground hover:text-foreground ml-0.5"
               >
                 <X className="size-3" />
@@ -391,6 +471,17 @@ export function AriaChat({
         >
           <Paperclip className="size-4" />
         </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="shrink-0"
+          disabled={isLoading}
+          onClick={openPicker}
+          title="Add a file from the Files section"
+        >
+          <FolderOpen className="size-4" />
+        </Button>
         <Textarea
           ref={textareaRef}
           value={input}
@@ -412,8 +503,84 @@ export function AriaChat({
           <Send className="size-4" />
         </Button>
       </div>
+
+      {/* Workspace file picker */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a file for Aria to read</DialogTitle>
+            <DialogDescription>
+              Pick one or more files from your workspace Files section. Aria
+              will read their contents.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 overflow-y-auto">
+            {loadingFiles ? (
+              <div className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-sm">
+                <Loader2 className="size-4 animate-spin" />
+                Loading files…
+              </div>
+            ) : workspaceFiles.length === 0 ? (
+              <p className="text-muted-foreground py-8 text-center text-sm">
+                No files found. Upload files in the Files section first.
+              </p>
+            ) : (
+              <ul className="space-y-1">
+                {workspaceFiles.map((file) => {
+                  const selected = selectedWorkspaceFiles.some(
+                    (f) => f.id === file.id
+                  );
+                  return (
+                    <li key={file.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleWorkspaceFile(file)}
+                        className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors ${
+                          selected ? "bg-primary/10" : "hover:bg-muted"
+                        }`}
+                      >
+                        <span
+                          className={`flex size-4 shrink-0 items-center justify-center rounded border ${
+                            selected
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-input"
+                          }`}
+                        >
+                          {selected && <Check className="size-3" />}
+                        </span>
+                        <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">
+                          {file.name}
+                        </span>
+                        <span className="text-muted-foreground shrink-0 text-xs">
+                          {formatFileSize(file.size)}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground text-xs">
+              {selectedWorkspaceFiles.length} selected
+            </span>
+            <Button type="button" size="sm" onClick={() => setPickerOpen(false)}>
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function formatFileSize(bytes: number | null): string {
+  if (bytes == null) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function MessageBubble({
