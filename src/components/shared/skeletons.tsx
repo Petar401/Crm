@@ -49,19 +49,21 @@ export function ListSkeleton({
   );
 }
 
-/** Mirrors the dashboard index: KPI cards, two cards, then an activity card. */
+/** Mirrors the dashboard index: KPI cards, pipeline + win rate, tasks + activity. */
 export function DashboardSkeleton() {
   return (
     <div>
       <PageHeaderSkeleton />
 
+      {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
-            <CardContent className="flex items-center justify-between">
+            <CardContent className="flex items-start justify-between">
               <div className="space-y-2">
                 <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-7 w-16" />
+                <Skeleton className="h-7 w-20" />
+                <Skeleton className="h-3 w-28" />
               </div>
               <Skeleton className="size-10 rounded-lg" />
             </CardContent>
@@ -69,25 +71,51 @@ export function DashboardSkeleton() {
         ))}
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-5 w-32" />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {Array.from({ length: 4 }).map((_, r) => (
-                <div key={r} className="flex items-center justify-between gap-4">
-                  <Skeleton className="h-4 w-40" />
+      {/* Pipeline funnel + win rate */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-4 w-32" />
                   <Skeleton className="h-4 w-16" />
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        ))}
+                <Skeleton className="h-2 w-full rounded-full" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-24" />
+          </CardHeader>
+          <CardContent className="flex flex-col items-center gap-4">
+            <Skeleton className="size-32 rounded-full" />
+            <Skeleton className="h-8 w-40" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="mt-4">
+      {/* Tasks + activity */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-32" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Array.from({ length: 5 }).map((_, r) => (
+              <div key={r} className="flex items-center justify-between gap-4">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <Skeleton className="h-5 w-32" />
