@@ -44,6 +44,7 @@ export async function authContextFromToken(
     .maybeSingle<{ email: string | null }>();
 
   const ctx = await loadAuthContextForUser(
+    admin,
     member.user_id,
     profile?.email ?? ""
   );
