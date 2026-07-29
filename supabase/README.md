@@ -19,6 +19,8 @@ by pasting into the dashboard SQL editor.
 | `migrations/0009_file_folders.sql` | Folders + workspace-level files for the Files manager |
 | `migrations/0010_shared_workspace.sql` | Consolidates all users/data into a single shared workspace |
 | `migrations/0011_lead_automation.sql` | Lead-finder campaigns + leads, RLS, permissions, and pg_cron/pg_net extensions |
+| `migrations/0012_leads_enhancements.sql` | Lead scoring/review enhancements |
+| `migrations/0013_api_tokens.sql` | Personal access tokens for the Claude/MCP connector, RLS, and the `settings.tokens` permission |
 | `seed.sql` | Permission catalog rows (required) + default-role baseline |
 
 ## Apply with the Supabase CLI (recommended)
@@ -41,7 +43,8 @@ migrations and `seed.sql` automatically).
 ## Apply via the dashboard
 
 Open **SQL Editor** and run, in order: `0001` → `0002` → `0003` → `0004` →
-`0005` → `0006` → `0007` → `0008` → `0009` → `0010` → `0011`, then `seed.sql`.
+`0005` → `0006` → `0007` → `0008` → `0009` → `0010` → `0011` → `0012` →
+`0013`, then `seed.sql`.
 
 ## After applying
 
