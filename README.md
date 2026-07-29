@@ -16,6 +16,9 @@ user-triggered **Gemini AI** actions executed server-side only.
   image previews.
 - **AI actions** — summarise notes, suggest a deal's next step, draft a follow-up, and generate a
   company brief. Runs only server-side, gated by the `ai.use` permission, disabled without a key.
+- **Claude connector (MCP)** — connect Claude Desktop to the CRM so Claude can search records,
+  create and update them, and log activity, all under your own permissions. See
+  [Connect Claude Desktop](#connect-claude-desktop).
 
 ## Tech stack
 
@@ -91,6 +94,28 @@ pnpm dev
 Open <http://localhost:3000>, sign up (this creates your workspace and makes you the owner),
 and invite teammates from **Settings**.
 
+## Connect Claude Desktop
+
+The CRM exposes a [Model Context Protocol](https://modelcontextprotocol.io) endpoint at
+`/api/mcp/mcp`, so Claude can work directly with your data — "add Acme Ltd as a customer",
+"what deals close this month?", "log that I called Jane".
+
+1. In the CRM, go to **Settings → Connectors & API tokens** and create a token. Copy it — it's
+   shown only once.
+2. In Claude Desktop, open **Settings → Connectors → Add custom connector**, enter
+   `https://<your-app>/api/mcp/mcp`, and paste the token as the bearer credential.
+3. Ask Claude to *list my companies* to confirm the connection.
+
+Notes:
+
+- **Everything runs as you.** A token is bound to your workspace membership, and every write goes
+  through the same `requirePermission` checks as the UI — Claude can never exceed your own access.
+- Revoke a token any time from the same screen; the connector loses access immediately.
+- Claude's free plan allows one custom connector, which is enough for this.
+- Tools available: search, list/get for companies, contacts, deals, tasks, notes, notebook notes,
+  leads, pipelines and team members; `create_record` / `update_record` / `delete_record` across
+  those entities; `log_activity`; and the CRM's own AI helpers.
+
 ## Security model
 
 - **Authorization lives in the database.** RLS is enabled on every table; reads are scoped to
@@ -101,6 +126,9 @@ and invite teammates from **Settings**.
   client code; the service-role client is marked `server-only`.
 - **Permission resolution order:** full access → member override → role default → deny. The
   workspace owner always retains full access.
+- **API tokens are stored hashed.** Only a SHA-256 digest of a personal access token is persisted;
+  the plaintext is displayed once at creation and never recoverable. MCP requests resolve the token
+  to its workspace member and run under that member's permission set.
 
 ## Deployment
 

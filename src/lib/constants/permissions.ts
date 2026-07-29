@@ -37,6 +37,7 @@ export const PERMISSION_KEYS = [
   "team.edit_roles",
   "settings.view",
   "settings.update",
+  "settings.tokens",
   "ai.use",
   "leads.view",
   "leads.create",
@@ -133,6 +134,10 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: [
       { key: "settings.view", description: "View settings" },
       { key: "settings.update", description: "Update settings" },
+      {
+        key: "settings.tokens",
+        description: "Create and revoke personal API tokens",
+      },
     ],
   },
   {

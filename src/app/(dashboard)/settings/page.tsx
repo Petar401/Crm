@@ -1,8 +1,12 @@
 import { redirect } from "next/navigation";
 
+import { headers } from "next/headers";
+
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
 import { getMembers } from "@/features/team/queries";
+import { getApiTokens } from "@/features/api-tokens/queries";
+import { ConnectorsPanel } from "@/features/api-tokens/components/connectors-panel";
 import { isAiConfigured } from "@/features/ai/gemini";
 import { TeamSettings } from "@/features/team/components/team-settings";
 import { InviteMemberDialog } from "@/features/team/components/invite-member-dialog";
@@ -22,6 +26,14 @@ export default async function SettingsPage() {
   const canViewTeam = allowed.has("team.view");
   const canInvite = allowed.has("team.invite");
   const canEditRoles = allowed.has("team.edit_roles");
+  const canManageTokens = allowed.has("settings.tokens");
+
+  const tokens = canManageTokens ? await getApiTokens(ctx.member.id) : [];
+  const headerList = await headers();
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    `${headerList.get("x-forwarded-proto") ?? "https"}://${headerList.get("host") ?? "localhost:3000"}`;
+  const mcpUrl = `${origin}/api/mcp/mcp`;
 
   return (
     <div>
@@ -64,6 +76,17 @@ export default async function SettingsPage() {
             <ChangePasswordForm />
           </CardContent>
         </Card>
+
+        {canManageTokens && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Connectors &amp; API tokens</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ConnectorsPanel tokens={tokens} mcpUrl={mcpUrl} />
+            </CardContent>
+          </Card>
+        )}
 
         {canViewTeam && (
           <div>

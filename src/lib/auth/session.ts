@@ -1,6 +1,8 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/db/types";
 
@@ -12,8 +14,35 @@ export interface AuthContext {
   member: WorkspaceMember;
 }
 
+/**
+ * When set, `getAuthContext` returns this instead of reading the cookie
+ * session, and `createClient()` returns a service-role client. Used by the
+ * MCP route to run existing server actions/queries under a bearer-token
+ * identity. Set via `runWithAuthOverride`.
+ */
+export interface AuthOverride {
+  ctx: AuthContext;
+  useServiceRole: true;
+}
+
+const overrideStore = new AsyncLocalStorage<AuthOverride>();
+
+export function getAuthOverride(): AuthOverride | undefined {
+  return overrideStore.getStore();
+}
+
+export function runWithAuthOverride<T>(
+  ctx: AuthContext,
+  fn: () => Promise<T>
+): Promise<T> {
+  return overrideStore.run({ ctx, useServiceRole: true }, fn);
+}
+
 /** The authenticated auth.users id, or null. Cached per request. */
 export const getUserId = cache(async (): Promise<string | null> => {
+  const override = getAuthOverride();
+  if (override) return override.ctx.userId;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -22,54 +51,69 @@ export const getUserId = cache(async (): Promise<string | null> => {
 });
 
 /**
+ * Loads the full auth context for a given user id. Used by both the cookie
+ * path and the bearer-token path; performs the workspace/profile joins the
+ * app needs.
+ */
+export async function loadAuthContextForUser(
+  userId: string,
+  email: string
+): Promise<AuthContext | null> {
+  const admin = createAdminClient();
+
+  const { data: member } = await admin
+    .from("workspace_members")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle<WorkspaceMember>();
+
+  if (!member) return null;
+
+  const [{ data: workspace }, { data: profile }] = await Promise.all([
+    admin
+      .from("workspaces")
+      .select("*")
+      .eq("id", member.workspace_id)
+      .single<Workspace>(),
+    admin.from("profiles").select("*").eq("id", userId).maybeSingle<Profile>(),
+  ]);
+
+  if (!workspace) return null;
+
+  return { userId, email, profile, workspace, member };
+}
+
+/**
  * Resolves the full auth context: the user, their profile, and their active
  * workspace membership (first workspace they belong to). Returns null when the
  * user is unauthenticated or has no workspace yet. Cached per request.
  */
 export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
+  const override = getAuthOverride();
+  if (override) return override.ctx;
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: member } = await supabase
-    .from("workspace_members")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle<WorkspaceMember>();
-
-  if (!member) {
-    return null;
-  }
-
-  const [{ data: workspace }, { data: profile }] = await Promise.all([
-    supabase
-      .from("workspaces")
-      .select("*")
-      .eq("id", member.workspace_id)
-      .single<Workspace>(),
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle<Profile>(),
-  ]);
-
-  if (!workspace) return null;
-
-  return {
-    userId: user.id,
-    email: user.email ?? "",
-    profile,
-    workspace,
-    member,
-  };
+  return loadAuthContextForUser(user.id, user.email ?? "");
 });
 
 /**
  * Like getAuthContext, but redirects: to /login when unauthenticated, or to
  * /onboarding when the user has no workspace yet. Use in protected pages/actions.
+ *
+ * When invoked under `runWithAuthOverride` (MCP path), the override is
+ * returned directly and no redirect can fire.
  */
 export async function requireAuthContext(): Promise<AuthContext> {
+  const override = getAuthOverride();
+  if (override) return override.ctx;
+
   const userId = await getUserId();
   if (!userId) redirect("/login");
 
