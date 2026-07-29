@@ -1,8 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/db/types";
 
@@ -54,14 +54,18 @@ export const getUserId = cache(async (): Promise<string | null> => {
  * Loads the full auth context for a given user id. Used by both the cookie
  * path and the bearer-token path; performs the workspace/profile joins the
  * app needs.
+ *
+ * The caller supplies the Supabase client to run the reads against. The
+ * cookie path passes its cookie-bound anon client (RLS scopes the reads to
+ * the current user); the MCP token path passes the admin client because
+ * there is no cookie session.
  */
 export async function loadAuthContextForUser(
+  db: SupabaseClient,
   userId: string,
   email: string
 ): Promise<AuthContext | null> {
-  const admin = createAdminClient();
-
-  const { data: member } = await admin
+  const { data: member } = await db
     .from("workspace_members")
     .select("*")
     .eq("user_id", userId)
@@ -72,12 +76,12 @@ export async function loadAuthContextForUser(
   if (!member) return null;
 
   const [{ data: workspace }, { data: profile }] = await Promise.all([
-    admin
+    db
       .from("workspaces")
       .select("*")
       .eq("id", member.workspace_id)
       .single<Workspace>(),
-    admin.from("profiles").select("*").eq("id", userId).maybeSingle<Profile>(),
+    db.from("profiles").select("*").eq("id", userId).maybeSingle<Profile>(),
   ]);
 
   if (!workspace) return null;
@@ -100,7 +104,7 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  return loadAuthContextForUser(user.id, user.email ?? "");
+  return loadAuthContextForUser(supabase, user.id, user.email ?? "");
 });
 
 /**
