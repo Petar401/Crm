@@ -9,7 +9,12 @@ export const maxDuration = 120;
 
 const mcpHandler = createMcpHandler(
   (server) => registerCrmTools(server),
-  { serverInfo: { name: "crm", version: "1.0.0" } }
+  { serverInfo: { name: "crm", version: "1.0.0" } },
+  // The route lives at `app/api/mcp/route.ts`, so it is served at `/api/mcp`.
+  // mcp-handler derives its streamable endpoint from `basePath` and matches the
+  // request path exactly (`url.pathname === basePath + "/mcp"`); without this it
+  // defaults to `/mcp` and every request to `/api/mcp` falls through to a 404.
+  { basePath: "/api" }
 );
 
 function unauthorized(request: Request): Response {
