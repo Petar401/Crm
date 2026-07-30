@@ -17,6 +17,17 @@ export interface ActionResult {
   error?: string;
 }
 
+/**
+ * Restricts a post-login redirect to a same-origin internal path. Rejects
+ * absolute URLs, protocol-relative (`//host`) and backslash tricks so `next`
+ * can never be turned into an open redirect.
+ */
+function safeInternalPath(next: string | undefined): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/";
+  if (next.startsWith("/\\") || next.includes("\\")) return "/";
+  return next;
+}
+
 export async function loginAction(values: unknown): Promise<ActionResult> {
   const parsed = loginSchema.safeParse(values);
   if (!parsed.success) {
@@ -32,7 +43,7 @@ export async function loginAction(values: unknown): Promise<ActionResult> {
   if (error) return { error: error.message };
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(safeInternalPath(parsed.data.next));
 }
 
 export async function signupAction(values: unknown): Promise<ActionResult> {

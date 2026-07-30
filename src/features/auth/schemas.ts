@@ -3,6 +3,8 @@ import { z } from "zod";
 export const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
   password: z.string().min(1, "Password is required"),
+  /** Optional internal path to return to after sign-in (validated server-side). */
+  next: z.string().optional(),
 });
 
 export const signupSchema = z.object({
