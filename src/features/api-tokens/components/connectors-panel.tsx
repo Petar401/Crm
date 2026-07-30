@@ -89,9 +89,10 @@ export function ConnectorsPanel({ tokens, mcpUrl }: Props) {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div className="text-muted-foreground text-sm">
-          Personal access tokens let external clients — like Claude Desktop&apos;s
-          MCP connector — read and write your CRM as you. Every action runs
-          under your permissions.
+          Connect Claude Desktop with the button below — no token needed; you
+          sign in and approve in your browser. Personal access tokens remain
+          available for scripts and other clients. Every action runs under your
+          permissions.
         </div>
         <Dialog
           open={createOpen}
@@ -237,17 +238,23 @@ export function ConnectorsPanel({ tokens, mcpUrl }: Props) {
           Connect Claude Desktop
         </div>
         <ol className="list-decimal space-y-1 pl-4">
-          <li>Create a token above and copy it.</li>
           <li>
             In Claude Desktop → Settings → Connectors, add a custom connector
-            with the URL{" "}
-            <code className="font-mono">{mcpUrl}</code> and paste the token as
-            the bearer credential.
+            with the URL <code className="font-mono">{mcpUrl}</code>.
+          </li>
+          <li>
+            Click Connect — you&apos;ll be sent here to sign in and approve
+            access. No token to copy.
           </li>
           <li>
             Ask Claude &quot;list my companies&quot; to confirm the connection.
           </li>
         </ol>
+        <div className="mt-2">
+          Prefer a manual token (for scripts or other clients)? Create one above
+          and send it as a <code className="font-mono">Bearer</code> credential
+          to the same URL.
+        </div>
       </div>
     </div>
   );

@@ -1,18 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/forgot-password", "/auth"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/auth",
+  // The OAuth consent page runs even when signed out so it can build its own
+  // ?next= login redirect (preserving the authorization request query).
+  "/oauth/authorize",
+];
 
 /**
- * Routes that authenticate themselves with a bearer token instead of the
- * cookie session (MCP connector, its RFC 9728 metadata, and the cron route).
- * Redirecting these to /login would break non-browser clients, which don't
- * follow redirects and would silently receive HTML instead of JSON.
+ * Routes that authenticate themselves (or are public metadata) instead of the
+ * cookie session: the MCP connector, its OAuth discovery/registration/token
+ * endpoints, and the cron route. Redirecting these to /login would break
+ * non-browser clients, which don't follow redirects and would silently receive
+ * HTML instead of JSON.
  */
 const BEARER_AUTH_PATHS = [
   "/api/mcp",
   "/api/cron",
+  "/api/oauth/token",
+  "/api/oauth/register",
   "/.well-known/oauth-protected-resource",
+  "/.well-known/oauth-authorization-server",
 ];
 
 /**

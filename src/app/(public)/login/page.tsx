@@ -9,7 +9,14 @@ import {
 } from "@/components/ui/card";
 import { LoginForm } from "@/features/auth/components/login-form";
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[] }>;
+}) {
+  const { next } = await searchParams;
+  const nextPath = typeof next === "string" ? next : undefined;
+
   return (
     <Card>
       <CardHeader>
@@ -17,7 +24,7 @@ export default function LoginPage() {
         <CardDescription>Sign in to your workspace</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <LoginForm />
+        <LoginForm next={nextPath} />
         <p className="text-muted-foreground text-center text-sm">
           Don&apos;t have an account?{" "}
           <Link href="/signup" className="text-foreground hover:underline">

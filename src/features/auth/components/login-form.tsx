@@ -18,7 +18,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +30,7 @@ export function LoginForm() {
   function onSubmit(values: LoginInput) {
     setError(null);
     startTransition(async () => {
-      const result = await loginAction(values);
+      const result = await loginAction({ ...values, next });
       if (result?.error) setError(result.error);
     });
   }
