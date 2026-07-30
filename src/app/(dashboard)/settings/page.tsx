@@ -33,7 +33,7 @@ export default async function SettingsPage() {
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL ??
     `${headerList.get("x-forwarded-proto") ?? "https"}://${headerList.get("host") ?? "localhost:3000"}`;
-  const mcpUrl = `${origin}/api/mcp/mcp`;
+  const mcpUrl = `${origin}/api/mcp`;
 
   return (
     <div>

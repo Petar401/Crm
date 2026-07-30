@@ -9,8 +9,7 @@ export const maxDuration = 120;
 
 const mcpHandler = createMcpHandler(
   (server) => registerCrmTools(server),
-  { serverInfo: { name: "crm", version: "1.0.0" } },
-  { basePath: "/api/mcp" }
+  { serverInfo: { name: "crm", version: "1.0.0" } }
 );
 
 function unauthorized(request: Request): Response {
@@ -21,7 +20,7 @@ function unauthorized(request: Request): Response {
       status: 401,
       headers: {
         "content-type": "application/json",
-        "www-authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/api/mcp/mcp"`,
+        "www-authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/api/mcp"`,
       },
     }
   );
