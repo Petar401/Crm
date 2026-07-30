@@ -97,13 +97,13 @@ and invite teammates from **Settings**.
 ## Connect Claude Desktop
 
 The CRM exposes a [Model Context Protocol](https://modelcontextprotocol.io) endpoint at
-`/api/mcp/mcp`, so Claude can work directly with your data — "add Acme Ltd as a customer",
+`/api/mcp`, so Claude can work directly with your data — "add Acme Ltd as a customer",
 "what deals close this month?", "log that I called Jane".
 
 1. In the CRM, go to **Settings → Connectors & API tokens** and create a token. Copy it — it's
    shown only once.
 2. In Claude Desktop, open **Settings → Connectors → Add custom connector**, enter
-   `https://<your-app>/api/mcp/mcp`, and paste the token as the bearer credential.
+   `https://<your-app>/api/mcp`, and paste the token as the bearer credential.
 3. Ask Claude to *list my companies* to confirm the connection.
 
 Notes:
