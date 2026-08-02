@@ -394,21 +394,20 @@ export interface BulkResult {
 }
 
 export async function bulkApproveLeads(ids: string[]): Promise<BulkResult> {
-  let count = 0;
-  for (const id of ids) {
-    const r = await convertLead(id);
-    if (!r.error) count += 1;
-  }
+  // Parallel: convertLead is per-lead and doesn't share DB rows across the
+  // batch, so we don't need serial execution. requireAuthContext /
+  // requirePermission are per-request cached, so the Promise.all only fans
+  // out the DB writes — cutting an N-lead batch from 5×N sequential
+  // round-trips to roughly 5×parallel.
+  const results = await Promise.all(ids.map((id) => convertLead(id)));
+  const count = results.filter((r) => !r.error).length;
   revalidatePath("/leads");
   return { count };
 }
 
 export async function bulkRejectLeads(ids: string[]): Promise<BulkResult> {
-  let count = 0;
-  for (const id of ids) {
-    const r = await rejectLead(id);
-    if (!r.error) count += 1;
-  }
+  const results = await Promise.all(ids.map((id) => rejectLead(id)));
+  const count = results.filter((r) => !r.error).length;
   revalidatePath("/leads");
   return { count };
 }
