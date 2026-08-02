@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
@@ -8,8 +9,14 @@ import {
   getContactOptions,
 } from "@/features/deals/queries";
 import { getCompanyOptions } from "@/features/contacts/queries";
-import { DealsBoard } from "@/features/deals/components/deals-board";
 import { PageHeader } from "@/components/shared/page-header";
+
+// DealsBoard pulls the drag-and-drop kanban client into its own chunk.
+const DealsBoard = nextDynamic(() =>
+  import("@/features/deals/components/deals-board").then((m) => ({
+    default: m.DealsBoard,
+  }))
+);
 
 export const dynamic = "force-dynamic";
 

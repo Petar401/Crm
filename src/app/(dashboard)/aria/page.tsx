@@ -1,8 +1,18 @@
+import nextDynamic from "next/dynamic";
+
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
 import { isAiConfigured } from "@/features/ai/gemini";
-import { AriaChat } from "@/features/aria/components/aria-chat";
 import { PageHeader } from "@/components/shared/page-header";
+
+// AriaChat carries the streaming chat client, its markdown renderer and any
+// downstream form logic. Splitting it into its own chunk keeps the initial
+// route payload small — the page shell paints before the chat JS loads.
+const AriaChat = nextDynamic(() =>
+  import("@/features/aria/components/aria-chat").then((m) => ({
+    default: m.AriaChat,
+  }))
+);
 
 export const dynamic = "force-dynamic";
 
