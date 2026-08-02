@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    # Group patch + minor bumps into one PR per ecosystem so the queue
+    # doesn't fill with dozens of individual bumps every week.
+    groups:
+      npm-minor:
+        update-types: ["minor", "patch"]
+      # Radix ships coordinated releases — group them.
+      radix-ui:
+        patterns:
+          - "@radix-ui/*"
+      # Supabase clients likewise.
+      supabase:
+        patterns:
+          - "@supabase/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
