@@ -30,6 +30,15 @@ const metadataSchema = z.object({
   folder_id: z.string().uuid().nullable().optional(),
 });
 
+/** Maps an attachment entity_type to the workspace-scoped table that owns it. */
+const ENTITY_TABLES = {
+  company: "companies",
+  contact: "contacts",
+  deal: "deals",
+  note: "notes",
+  lead: "leads",
+} as const;
+
 /** Records attachment metadata after the file has been uploaded to storage. */
 export async function recordAttachment(values: unknown): Promise<ActionResult> {
   const parsed = metadataSchema.safeParse(values);
@@ -46,6 +55,22 @@ export async function recordAttachment(values: unknown): Promise<ActionResult> {
   }
 
   const supabase = await createClient();
+
+  // Confirm the target entity actually belongs to this workspace. Without this,
+  // a user with `files.upload` could pass any UUID as `entity_id` and bolt a
+  // spoofed attachment (and the file_uploaded activity that follows) onto
+  // records they should not touch, or that live in another tenant.
+  if (parsed.data.entity_type !== "workspace") {
+    const table = ENTITY_TABLES[parsed.data.entity_type];
+    const { data: owned } = await supabase
+      .from(table)
+      .select("id")
+      .eq("id", parsed.data.entity_id)
+      .eq("workspace_id", ctx.workspace.id)
+      .maybeSingle<{ id: string }>();
+    if (!owned) return { error: "Target record not found." };
+  }
+
   const { error } = await supabase.from("attachments").insert({
     workspace_id: ctx.workspace.id,
     entity_type: parsed.data.entity_type,
