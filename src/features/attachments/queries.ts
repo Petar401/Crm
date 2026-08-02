@@ -1,4 +1,7 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { createClient } from "@/lib/supabase/server";
+import { LIST_LIMIT } from "@/lib/constants/list";
 import type { Attachment, EntityType, Folder } from "@/lib/db/types";
 import { ATTACHMENT_BUCKET } from "@/features/attachments/constants";
 
@@ -6,11 +9,15 @@ export interface AttachmentWithUrl extends Attachment {
   signed_url: string | null;
 }
 
+/**
+ * Signs URLs for a batch of attachments. Takes the caller's Supabase client
+ * so we don't re-cross the cookies() barrier for every attachment page load.
+ */
 async function withSignedUrls(
+  supabase: SupabaseClient,
   attachments: Attachment[]
 ): Promise<AttachmentWithUrl[]> {
   if (attachments.length === 0) return [];
-  const supabase = await createClient();
   const paths = attachments.map((a) => a.storage_path);
   const { data: signed } = await supabase.storage
     .from(ATTACHMENT_BUCKET)
@@ -38,9 +45,10 @@ export async function getEntityAttachments(
     .eq("workspace_id", workspaceId)
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
 
-  return withSignedUrls((data ?? []) as Attachment[]);
+  return withSignedUrls(supabase, (data ?? []) as Attachment[]);
 }
 
 export async function getAllAttachments(
@@ -51,9 +59,10 @@ export async function getAllAttachments(
     .from("attachments")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
 
-  return withSignedUrls((data ?? []) as Attachment[]);
+  return withSignedUrls(supabase, (data ?? []) as Attachment[]);
 }
 
 /** Attachment records for the given ids within a workspace (no signed URLs). */
@@ -79,7 +88,8 @@ export async function getFolders(workspaceId: string): Promise<Folder[]> {
     .from("folders")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .order("name", { ascending: true });
+    .order("name", { ascending: true })
+    .limit(LIST_LIMIT);
 
   return (data ?? []) as Folder[];
 }
@@ -100,8 +110,10 @@ export async function getWorkspaceFiles(
     ? query.eq("folder_id", folderId)
     : query.is("folder_id", null);
 
-  const { data } = await query.order("created_at", { ascending: false });
-  return withSignedUrls((data ?? []) as Attachment[]);
+  const { data } = await query
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
+  return withSignedUrls(supabase, (data ?? []) as Attachment[]);
 }
 
 /** Files attached to CRM records (everything except the file manager). */
@@ -114,7 +126,8 @@ export async function getRecordAttachments(
     .select("*")
     .eq("workspace_id", workspaceId)
     .neq("entity_type", "workspace")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
 
-  return withSignedUrls((data ?? []) as Attachment[]);
+  return withSignedUrls(supabase, (data ?? []) as Attachment[]);
 }

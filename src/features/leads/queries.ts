@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { LIST_LIMIT } from "@/lib/constants/list";
 import type { Lead, LeadCampaign, LeadStatus } from "@/lib/db/types";
 
 export async function getCampaigns(
@@ -10,7 +11,8 @@ export async function getCampaigns(
     .from("lead_campaigns")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
   return (data ?? []) as LeadCampaign[];
 }
 
@@ -40,7 +42,8 @@ export async function getLeads(
   if (status) query = query.eq("status", status);
   const { data } = await query
     .order("match_score", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
   return (data ?? []) as Lead[];
 }
 

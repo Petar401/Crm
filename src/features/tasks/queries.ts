@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { LIST_LIMIT } from "@/lib/constants/list";
 import type { Task } from "@/lib/db/types";
 
 export interface TaskWithRelations extends Task {
@@ -17,6 +18,7 @@ export async function getTasks(
       "*, assignee:profiles!tasks_assigned_to_fkey(id, full_name), company:companies(id, name), deal:deals(id, name)"
     )
     .eq("workspace_id", workspaceId)
-    .order("due_at", { ascending: true, nullsFirst: false });
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .limit(LIST_LIMIT);
   return (data ?? []) as TaskWithRelations[];
 }

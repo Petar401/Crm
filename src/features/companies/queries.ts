@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { LIST_LIMIT } from "@/lib/constants/list";
 import type { Company, Contact, Deal } from "@/lib/db/types";
 
 export interface CompanyListItem extends Company {
@@ -20,7 +21,8 @@ export async function getCompanies(
     .from("companies_with_stats")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
 
   return (data ?? []).map((row) => {
     const {
@@ -63,7 +65,8 @@ export async function getCompanyContacts(
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("company_id", companyId)
-    .order("is_primary", { ascending: false });
+    .order("is_primary", { ascending: false })
+    .limit(LIST_LIMIT);
   return (data ?? []) as Contact[];
 }
 
@@ -77,6 +80,7 @@ export async function getCompanyDeals(
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("company_id", companyId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
   return (data ?? []) as Deal[];
 }
