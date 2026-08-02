@@ -1,14 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { ChevronRight } from "lucide-react";
 
 import type { MemberWithProfile } from "@/features/team/queries";
-import { PermissionEditor } from "@/features/permissions/components/permission-editor";
 import { initialsOf } from "@/lib/utils/format";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+
+// The permission matrix only mounts when the admin actually opens a member.
+// Splitting it out keeps the /settings/team initial render lean.
+const PermissionEditor = dynamic(
+  () =>
+    import("@/features/permissions/components/permission-editor").then((m) => ({
+      default: m.PermissionEditor,
+    })),
+  { ssr: false }
+);
 
 interface TeamSettingsProps {
   members: MemberWithProfile[];

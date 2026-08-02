@@ -13,6 +13,18 @@ export function Markdown({ content }: { content: string }) {
   return <div className="space-y-2 text-sm leading-relaxed">{renderBlocks(content)}</div>;
 }
 
+/**
+ * Allow-list of URL schemes safe to render as a clickable anchor. React 19
+ * no longer strips `javascript:` at render time, so untrusted markdown links
+ * (from the AI assistant or from lead website content passed through the AI)
+ * must be filtered here.
+ */
+function isSafeHref(href: string): boolean {
+  const trimmed = href.trim();
+  if (trimmed.startsWith("/") || trimmed.startsWith("#")) return true;
+  return /^(https?:|mailto:|tel:)/i.test(trimmed);
+}
+
 function renderBlocks(source: string): ReactNode[] {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
@@ -190,7 +202,7 @@ function renderInline(text: string): ReactNode[] {
       nodes.push(<em key={key++}>{renderInline(token.slice(1, -1))}</em>);
     } else {
       const link = token.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
-      if (link) {
+      if (link && isSafeHref(link[2])) {
         nodes.push(
           <a
             key={key++}
@@ -202,6 +214,10 @@ function renderInline(text: string): ReactNode[] {
             {link[1]}
           </a>
         );
+      } else if (link) {
+        // Unsafe scheme (javascript:, data:, vbscript:, ...) — render the
+        // label as plain text so the URL never becomes clickable.
+        nodes.push(<span key={key++}>{link[1]}</span>);
       } else {
         nodes.push(token);
       }

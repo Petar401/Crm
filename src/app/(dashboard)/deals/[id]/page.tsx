@@ -25,19 +25,21 @@ export default async function DealDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const ctx = await requireAuthContext();
-  const { allowed } = await getPermissionSet();
+  const [ctx, { allowed }] = await Promise.all([
+    requireAuthContext(),
+    getPermissionSet(),
+  ]);
   if (!allowed.has("deals.view")) redirect("/");
 
-  const deal = await getDeal(ctx.workspace.id, id);
-  if (!deal) notFound();
-
-  const [stages, notes, attachments, activities] = await Promise.all([
-    getStages(ctx.workspace.id),
-    getNotes(ctx.workspace.id, { dealId: id }),
-    getEntityAttachments(ctx.workspace.id, "deal", id),
-    getEntityActivities(ctx.workspace.id, { dealId: id }),
+  const workspaceId = ctx.workspace.id;
+  const [deal, stages, notes, attachments, activities] = await Promise.all([
+    getDeal(workspaceId, id),
+    getStages(workspaceId),
+    getNotes(workspaceId, { dealId: id }),
+    getEntityAttachments(workspaceId, "deal", id),
+    getEntityActivities(workspaceId, { dealId: id }),
   ]);
+  if (!deal) notFound();
 
   const stageName = stages.find((s) => s.id === deal.stage_id)?.name ?? "—";
   const aiEnabled = isAiConfigured() && allowed.has("ai.use");

@@ -8,8 +8,15 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const ctx = await requireAuthContext();
-  const { allowed } = await getPermissionSet();
+  // Kick both fetches off in parallel — getPermissionSet does not depend on
+  // requireAuthContext's return, so awaiting them sequentially forces two
+  // round-trips (auth query, then the two permission queries) instead of
+  // running them concurrently. React `cache()` still de-dupes any repeats
+  // downstream.
+  const [ctx, { allowed }] = await Promise.all([
+    requireAuthContext(),
+    getPermissionSet(),
+  ]);
 
   return (
     <div className="flex min-h-dvh">

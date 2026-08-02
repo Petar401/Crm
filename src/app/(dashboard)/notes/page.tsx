@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
@@ -6,8 +7,15 @@ import {
   getNoteFolders,
   getNotebookNotes,
 } from "@/features/notebook/queries";
-import { NotebookView } from "@/features/notebook/components/notebook-view";
 import { PageHeader } from "@/components/shared/page-header";
+
+// Notebook view bundles the editor + folder tree. Splitting keeps other
+// dashboard routes from carrying its JS.
+const NotebookView = nextDynamic(() =>
+  import("@/features/notebook/components/notebook-view").then((m) => ({
+    default: m.NotebookView,
+  }))
+);
 
 export const dynamic = "force-dynamic";
 

@@ -33,20 +33,23 @@ export default async function LeadDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const ctx = await requireAuthContext();
-  const { allowed } = await getPermissionSet();
+  const [ctx, { allowed }] = await Promise.all([
+    requireAuthContext(),
+    getPermissionSet(),
+  ]);
   if (!allowed.has("leads.view")) redirect("/");
 
-  const lead = await getLead(ctx.workspace.id, id);
+  const workspaceId = ctx.workspace.id;
+  const [lead, members, stages, notes, attachments, activities] =
+    await Promise.all([
+      getLead(workspaceId, id),
+      getMemberOptions(workspaceId),
+      getStages(workspaceId),
+      getNotes(workspaceId, { leadId: id }),
+      getEntityAttachments(workspaceId, "lead", id),
+      getEntityActivities(workspaceId, { leadId: id }),
+    ]);
   if (!lead) notFound();
-
-  const [members, stages, notes, attachments, activities] = await Promise.all([
-    getMemberOptions(ctx.workspace.id),
-    getStages(ctx.workspace.id),
-    getNotes(ctx.workspace.id, { leadId: id }),
-    getEntityAttachments(ctx.workspace.id, "lead", id),
-    getEntityActivities(ctx.workspace.id, { leadId: id }),
-  ]);
 
   const aiEnabled = isAiConfigured() && allowed.has("ai.use");
   const ownerName =

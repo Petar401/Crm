@@ -1,7 +1,27 @@
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 
-export async function getCrmContext(workspaceId: string): Promise<string> {
-  const supabase = await createClient();
+import { createAdminClient } from "@/lib/supabase/admin";
+
+/**
+ * CRM snapshot bundled into Aria's system prompt on every chat turn.
+ *
+ * Previously this ran 7 unbounded workspace queries per assistant message,
+ * so a 3-turn conversation on a modest workspace fired ~21 Supabase calls
+ * before the model even started. The snapshot doesn't change turn-to-turn,
+ * so we wrap it in `unstable_cache` keyed by workspace_id with a 30 s TTL:
+ * subsequent turns in the same chat reuse a hot copy, and a mutating action
+ * (or the next natural cache turnover) refreshes it.
+ *
+ * The cached reads use the service-role admin client — `unstable_cache` runs
+ * outside the request scope, so it can't consult cookies. The caller has
+ * already established the workspace_id via requireAuthContext / MCP token
+ * resolution, so bypassing RLS here does not widen access; it just hoists
+ * the cache above the auth boundary.
+ */
+const CACHE_TTL_S = 30;
+
+async function loadCrmContext(workspaceId: string): Promise<string> {
+  const supabase = createAdminClient();
 
   const [companies, contacts, deals, tasks, activities, notes, leads] =
     await Promise.all([
@@ -61,4 +81,12 @@ export async function getCrmContext(workspaceId: string): Promise<string> {
     notebookNotes: notes.data ?? [],
     leads: leads.data ?? [],
   });
+}
+
+export async function getCrmContext(workspaceId: string): Promise<string> {
+  return unstable_cache(
+    () => loadCrmContext(workspaceId),
+    ["aria-crm-context", workspaceId],
+    { revalidate: CACHE_TTL_S, tags: [`crm-context:${workspaceId}`] }
+  )();
 }

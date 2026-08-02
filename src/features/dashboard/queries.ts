@@ -54,32 +54,26 @@ export async function getDashboardData(
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
   const [
-    { data: openDealsData },
+    { data: allDealsData },
     { data: stages },
-    { data: closedDealsData },
     { count: dueTodayCount },
     { count: overdueCount },
     { data: upcomingTasks },
     { data: leadCompanyRows },
     { data: recentActivity },
   ] = await Promise.all([
+    // One deals fetch instead of two: covers open (pipeline tiles) and
+    // won/lost (win-rate + won-this-month trend) in a single round-trip.
+    // updated_at is the close-date proxy — there is no dedicated closed_at.
     supabase
       .from("deals")
-      .select("id, value, stage_id, probability")
-      .eq("workspace_id", workspaceId)
-      .eq("status", "open"),
+      .select("id, value, stage_id, probability, status, updated_at")
+      .eq("workspace_id", workspaceId),
     supabase
       .from("deal_stages")
-      .select("*")
+      .select("id, workspace_id, pipeline_id, name, position, color")
       .eq("workspace_id", workspaceId)
       .order("position", { ascending: true }),
-    // Won/lost deals power win-rate and the won-this-month trend. There is no
-    // dedicated closed_at column, so `updated_at` is used as the close-date proxy.
-    supabase
-      .from("deals")
-      .select("value, status, updated_at")
-      .eq("workspace_id", workspaceId)
-      .in("status", ["won", "lost"]),
     supabase
       .from("tasks")
       .select("id", { count: "exact", head: true })
@@ -97,7 +91,9 @@ export async function getDashboardData(
       .lt("due_at", startOfToday.toISOString()),
     supabase
       .from("tasks")
-      .select("*")
+      .select(
+        "id, workspace_id, title, description, status, priority, due_at, assigned_to, company_id, contact_id, deal_id, created_by, created_at, updated_at"
+      )
       .eq("workspace_id", workspaceId)
       .neq("status", "done")
       .neq("status", "cancelled")
@@ -117,11 +113,13 @@ export async function getDashboardData(
       .limit(8),
   ]);
 
-  // --- Open pipeline ---
-  const deals = (openDealsData ?? []) as Pick<
+  const allDeals = (allDealsData ?? []) as (Pick<
     Deal,
     "id" | "value" | "stage_id" | "probability"
-  >[];
+  > & { status: "open" | "won" | "lost"; updated_at: string })[];
+
+  // --- Open pipeline ---
+  const deals = allDeals.filter((d) => d.status === "open");
   const pipelineValue = deals.reduce((sum, d) => sum + (d.value ?? 0), 0);
   const weightedPipeline = deals.reduce(
     (sum, d) => sum + (d.value ?? 0) * ((d.probability ?? 0) / 100),
@@ -139,11 +137,9 @@ export async function getDashboardData(
   });
 
   // --- Won / conversion ---
-  const closed = (closedDealsData ?? []) as {
-    value: number | null;
-    status: "won" | "lost";
-    updated_at: string;
-  }[];
+  const closed = allDeals.filter(
+    (d) => d.status === "won" || d.status === "lost"
+  );
   const wonDeals = closed.filter((d) => d.status === "won");
   const wonCount = wonDeals.length;
   const lostCount = closed.length - wonCount;

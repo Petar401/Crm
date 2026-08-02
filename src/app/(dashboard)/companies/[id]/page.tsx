@@ -31,23 +31,36 @@ export default async function CompanyDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const ctx = await requireAuthContext();
-  const { allowed } = await getPermissionSet();
+  const [ctx, { allowed }] = await Promise.all([
+    requireAuthContext(),
+    getPermissionSet(),
+  ]);
   if (!allowed.has("companies.view")) redirect("/");
 
-  const company = await getCompany(ctx.workspace.id, id);
+  // Start every panel's fetch in parallel with the primary getCompany fetch.
+  // Previously the page awaited the company row first, adding one round-trip
+  // of latency before the panels could even start loading.
+  const workspaceId = ctx.workspace.id;
+  const [
+    company,
+    contacts,
+    deals,
+    notes,
+    attachments,
+    activities,
+    members,
+    stages,
+  ] = await Promise.all([
+    getCompany(workspaceId, id),
+    getCompanyContacts(workspaceId, id),
+    getCompanyDeals(workspaceId, id),
+    getNotes(workspaceId, { companyId: id }),
+    getEntityAttachments(workspaceId, "company", id),
+    getEntityActivities(workspaceId, { companyId: id }),
+    getMemberOptions(workspaceId),
+    getStages(workspaceId),
+  ]);
   if (!company) notFound();
-
-  const [contacts, deals, notes, attachments, activities, members, stages] =
-    await Promise.all([
-      getCompanyContacts(ctx.workspace.id, id),
-      getCompanyDeals(ctx.workspace.id, id),
-      getNotes(ctx.workspace.id, { companyId: id }),
-      getEntityAttachments(ctx.workspace.id, "company", id),
-      getEntityActivities(ctx.workspace.id, { companyId: id }),
-      getMemberOptions(ctx.workspace.id),
-      getStages(ctx.workspace.id),
-    ]);
 
   const aiEnabled = isAiConfigured() && allowed.has("ai.use");
 

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { LIST_LIMIT } from "@/lib/constants/list";
 import type { NoteFolder, NotebookNote } from "@/lib/db/types";
 
 export async function getNoteFolders(
@@ -9,7 +10,8 @@ export async function getNoteFolders(
     .from("note_folders")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .order("name", { ascending: true });
+    .order("name", { ascending: true })
+    .limit(LIST_LIMIT);
   return (data ?? []) as NoteFolder[];
 }
 
@@ -21,6 +23,7 @@ export async function getNotebookNotes(
     .from("notebook_notes")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(LIST_LIMIT);
   return (data ?? []) as NotebookNote[];
 }

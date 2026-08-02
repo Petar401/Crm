@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getAuthContext } from "@/lib/auth/session";
 import { validateAuthorize, redirectWith } from "@/features/oauth/authorize";
+import { mintOAuthCsrfToken } from "@/features/oauth/csrf";
 import {
   Card,
   CardContent,
@@ -77,6 +78,16 @@ export default async function AuthorizePage({
   }
 
   const clientName = result.client.client_name?.trim() || "An application";
+  // Bind the consent form to this user's session. A third-party site cannot
+  // mint or read this token, so it cannot CSRF the victim into approving.
+  const csrf = mintOAuthCsrfToken(ctx.userId);
+
+  let redirectHost: string | null = null;
+  try {
+    redirectHost = new URL(result.redirectUri).host;
+  } catch {
+    redirectHost = null;
+  }
 
   return (
     <Card>
@@ -90,6 +101,14 @@ export default async function AuthorizePage({
         <div className="rounded-md border bg-muted/30 p-3 text-sm">
           <div className="text-muted-foreground">Signed in as</div>
           <div className="font-medium">{ctx.email}</div>
+          {redirectHost ? (
+            <>
+              <div className="text-muted-foreground mt-2">
+                It will receive tokens at
+              </div>
+              <div className="font-mono text-xs">{redirectHost}</div>
+            </>
+          ) : null}
           <div className="text-muted-foreground mt-2">
             It will be able to read and write your workspace&apos;s companies,
             contacts, deals, tasks, notes and leads — always limited to your own
@@ -102,6 +121,7 @@ export default async function AuthorizePage({
               <input key={key} type="hidden" name={key} value={params[key]} />
             ) : null
           )}
+          <input type="hidden" name="csrf" value={csrf} />
           <Button
             type="submit"
             name="decision"

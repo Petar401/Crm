@@ -1,0 +1,75 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly scan against main so upstream advisories against installed
+    # dependencies still surface even when the branch is quiet.
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: Gitleaks secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
+
+  semgrep:
+    name: Semgrep static analysis
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      # The `github-actions-mutable-action-tag` rule is legit best-practice
+      # (pin every action to a 40-char SHA), but rolling it out across every
+      # workflow step is a broad, mechanical change that belongs in its own
+      # PR — done properly with dependabot version updates targeting SHA
+      # pinning. Excluding it here keeps this PR focused on code-level
+      # findings; the follow-up will re-enable the rule.
+      - run: |
+          semgrep ci \
+            --config=p/nextjs \
+            --config=p/typescript \
+            --config=p/owasp-top-ten \
+            --config=p/react \
+            --exclude-rule=yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  audit:
+    name: pnpm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      # Report but do not fail on non-prod moderate findings. Bumps land
+      # via Dependabot; this job's job is visibility.
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high || true
+
+  # NOTE: A dedicated OSV-Scanner job used to live here (`google/osv-scanner-action`)
+  # but the action does not publish a floating major tag and we don't want to pin
+  # a specific version blindly in this PR. `pnpm audit` above + Dependabot already
+  # cover the dependency-vuln surface; re-add OSV-Scanner in a follow-up once
+  # someone verifies the current recommended action ref.

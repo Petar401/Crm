@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { LIST_LIMIT } from "@/lib/constants/list";
 import type { Note } from "@/lib/db/types";
 
 export interface EntityRef {
@@ -23,6 +24,8 @@ export async function getNotes(
   if (ref.dealId) query = query.eq("deal_id", ref.dealId);
   if (ref.leadId) query = query.eq("lead_id", ref.leadId);
 
-  const { data } = await query.order("created_at", { ascending: false });
+  const { data } = await query
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
   return (data ?? []) as Note[];
 }

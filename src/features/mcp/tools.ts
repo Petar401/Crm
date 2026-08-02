@@ -65,6 +65,20 @@ async function workspaceId(): Promise<string> {
   return ctx.workspace.id;
 }
 
+/**
+ * Sanitizes a value that will be templated into a PostgREST `.or(...)` filter
+ * or `.ilike(...)` pattern. Removes the OR-filter meta-characters (`,()"`) —
+ * any of which would let a caller break out of the current column term and
+ * bolt on new predicates — and neutralises the SQL `LIKE` wildcards `%` and
+ * `_` so a bare user query can't match every row via `%%`.
+ */
+function escapePostgrestOrValue(value: string): string {
+  return value
+    .replace(/[,()"']/g, " ")
+    .replace(/[%_\\]/g, " ")
+    .trim();
+}
+
 export function registerCrmTools(server: McpServer): void {
   // ---------------------------------------------------------------- reads
 
@@ -257,7 +271,11 @@ export function registerCrmTools(server: McpServer): void {
       guard(async () => {
         const ws = await workspaceId();
         const supabase = await createClient();
-        const like = `%${query}%`;
+        // Escape PostgREST OR-filter meta-characters so a query containing
+        // commas / parens / quotes can't inject extra terms and read columns
+        // the caller was not meant to reach (e.g. `),status.eq.won`).
+        const escaped = escapePostgrestOrValue(query);
+        const like = `*${escaped}*`;
 
         const [companies, contacts, deals, leads] = await Promise.all([
           supabase
@@ -276,7 +294,7 @@ export function registerCrmTools(server: McpServer): void {
             .from("deals")
             .select("id, company_id, name, value, currency, status")
             .eq("workspace_id", ws)
-            .ilike("name", like)
+            .ilike("name", `%${escaped}%`)
             .limit(limit),
           supabase
             .from("leads")

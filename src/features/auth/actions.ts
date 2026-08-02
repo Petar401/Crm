@@ -12,20 +12,10 @@ import {
   updatePasswordSchema,
   changePasswordSchema,
 } from "@/features/auth/schemas";
+import { safeInternalPath } from "@/lib/utils/safe-next";
 
 export interface ActionResult {
   error?: string;
-}
-
-/**
- * Restricts a post-login redirect to a same-origin internal path. Rejects
- * absolute URLs, protocol-relative (`//host`) and backslash tricks so `next`
- * can never be turned into an open redirect.
- */
-function safeInternalPath(next: string | undefined): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/";
-  if (next.startsWith("/\\") || next.includes("\\")) return "/";
-  return next;
 }
 
 export async function loginAction(values: unknown): Promise<ActionResult> {

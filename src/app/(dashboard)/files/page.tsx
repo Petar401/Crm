@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
@@ -7,10 +8,17 @@ import {
   getWorkspaceFiles,
   getRecordAttachments,
 } from "@/features/attachments/queries";
-import { FilesManager } from "@/features/attachments/components/files-manager";
 import { FilesGallery } from "@/features/attachments/components/files-gallery";
 import { PageHeader } from "@/components/shared/page-header";
 import type { Folder } from "@/lib/db/types";
+
+// FilesManager carries the upload widget, folder tree, and drag-drop client.
+// Splits into its own chunk so the /files initial route payload stays small.
+const FilesManager = nextDynamic(() =>
+  import("@/features/attachments/components/files-manager").then((m) => ({
+    default: m.FilesManager,
+  }))
+);
 
 export const dynamic = "force-dynamic";
 
