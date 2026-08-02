@@ -201,11 +201,22 @@ export async function deleteAttachment(id: string): Promise<ActionResult> {
   return {};
 }
 
-/** Returns a short-lived signed URL for viewing/downloading a stored file. */
+/**
+ * Returns a short-lived signed URL for viewing/downloading a stored file.
+ * Requires `files.view` and asserts the requested path lives under the
+ * current workspace's storage prefix, so a member of workspace A can never
+ * sign a URL for a file in workspace B (should storage-level RLS ever loosen).
+ */
 export async function getSignedUrl(
   storagePath: string
 ): Promise<{ url?: string; error?: string }> {
-  await requireAuthContext();
+  const ctx = await requireAuthContext();
+  await requirePermission("files.view");
+
+  if (!storagePath.startsWith(`${ctx.workspace.id}/`)) {
+    return { error: "Invalid storage path." };
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase.storage
     .from(ATTACHMENT_BUCKET)

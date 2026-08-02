@@ -6,6 +6,7 @@ import {
   redirectWith,
   type AuthorizeParams,
 } from "@/features/oauth/authorize";
+import { verifyOAuthCsrfToken } from "@/features/oauth/csrf";
 import { issueAuthorizationCode } from "@/features/oauth/store";
 import { mcpResource } from "@/features/oauth/metadata";
 
@@ -55,6 +56,20 @@ export async function POST(request: Request): Promise<Response> {
     }
     const next = `/oauth/authorize?${query.toString()}`;
     return see(`${origin}/login?next=${encodeURIComponent(next)}`);
+  }
+
+  // Session-bound CSRF check. A third-party site can render a hidden form that
+  // POSTs to this endpoint with the OAuth params, but it cannot mint a token
+  // that validates against this signed-in user, so the approval fails.
+  const csrf = field(form, "csrf");
+  if (!verifyOAuthCsrfToken(csrf, ctx.userId)) {
+    return see(
+      redirectWith(result.redirectUri, {
+        error: "access_denied",
+        error_description: "Missing or expired consent token",
+        state: result.state,
+      })
+    );
   }
 
   if (decision !== "approve") {
