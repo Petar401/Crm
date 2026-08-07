@@ -32,6 +32,9 @@ export const PERMISSION_KEYS = [
   "files.view",
   "files.upload",
   "files.delete",
+  "invoices.view",
+  "invoices.upload",
+  "invoices.delete",
   "team.view",
   "team.invite",
   "team.edit_roles",
@@ -119,6 +122,14 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "files.view", description: "View files" },
       { key: "files.upload", description: "Upload files" },
       { key: "files.delete", description: "Delete files" },
+    ],
+  },
+  {
+    label: "Invoices",
+    permissions: [
+      { key: "invoices.view", description: "View invoices & receipts" },
+      { key: "invoices.upload", description: "Upload invoices & manage folders" },
+      { key: "invoices.delete", description: "Delete invoices & folders" },
     ],
   },
   {

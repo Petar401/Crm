@@ -31,6 +31,9 @@ insert into public.permissions (key, description) values
   ('files.view',       'View files'),
   ('files.upload',     'Upload files'),
   ('files.delete',     'Delete files'),
+  ('invoices.view',    'View invoices & receipts'),
+  ('invoices.upload',  'Upload invoices & manage folders'),
+  ('invoices.delete',  'Delete invoices & folders'),
   ('team.view',        'View team members'),
   ('team.invite',      'Invite team members'),
   ('team.edit_roles',  'Edit roles & permissions'),
@@ -60,6 +63,7 @@ where r.is_default
     'notes.view','notes.create','notes.update',
     'notebook.view','notebook.create','notebook.update',
     'files.view','files.upload',
+    'invoices.view','invoices.upload',
     'team.view','settings.view','ai.use',
     'leads.view','leads.create','leads.update'
   )

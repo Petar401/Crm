@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Download, Trash2 } from "lucide-react";
+import { FileText, Download, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 import type { AttachmentWithUrl } from "@/features/attachments/queries";
@@ -10,6 +11,11 @@ import { formatDateTime } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import {
+  FileViewer,
+  isViewable,
+  type ViewableFile,
+} from "@/components/shared/file-viewer";
 
 function formatSize(bytes: number | null): string {
   if (!bytes) return "";
@@ -33,6 +39,16 @@ export function FilesGallery({
   canDelete: boolean;
 }) {
   const router = useRouter();
+  const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
+
+  function openViewer(file: AttachmentWithUrl) {
+    if (!file.signed_url) return;
+    setViewerFile({
+      url: file.signed_url,
+      fileName: file.file_name,
+      mimeType: file.mime_type,
+    });
+  }
 
   async function remove(id: string) {
     const result = await deleteAttachment(id);
@@ -57,22 +73,30 @@ export function FilesGallery({
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {attachments.map((file) => {
         const isImage = file.mime_type?.startsWith("image/");
+        const viewable = isViewable(file.mime_type) && !!file.signed_url;
         const href = ENTITY_HREF[file.entity_type]?.(file.entity_id) ?? null;
         return (
           <div key={file.id} className="rounded-lg border p-3">
             <div className="flex items-center gap-3">
-              {isImage && file.signed_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={file.signed_url}
-                  alt={file.file_name}
-                  className="size-12 shrink-0 rounded object-cover"
-                />
-              ) : (
-                <div className="bg-muted flex size-12 shrink-0 items-center justify-center rounded">
-                  <FileText className="text-muted-foreground size-5" />
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => viewable && openViewer(file)}
+                className={`shrink-0 ${viewable ? "cursor-pointer" : "cursor-default"}`}
+                aria-label={viewable ? `Preview ${file.file_name}` : undefined}
+              >
+                {isImage && file.signed_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={file.signed_url}
+                    alt={file.file_name}
+                    className="size-12 rounded object-cover"
+                  />
+                ) : (
+                  <div className="bg-muted flex size-12 items-center justify-center rounded">
+                    <FileText className="text-muted-foreground size-5" />
+                  </div>
+                )}
+              </button>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{file.file_name}</p>
                 <p className="text-muted-foreground text-xs">
@@ -89,6 +113,17 @@ export function FilesGallery({
                 )}
               </Badge>
               <div className="flex items-center gap-1">
+                {viewable && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    onClick={() => openViewer(file)}
+                    aria-label="Preview"
+                  >
+                    <Eye className="size-3.5" />
+                  </Button>
+                )}
                 {file.signed_url && (
                   <Button size="icon" variant="ghost" className="size-7" asChild>
                     <a
@@ -115,6 +150,11 @@ export function FilesGallery({
           </div>
         );
       })}
+
+      <FileViewer
+        file={viewerFile}
+        onOpenChange={(open) => !open && setViewerFile(null)}
+      />
     </div>
   );
 }

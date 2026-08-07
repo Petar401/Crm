@@ -8,6 +8,7 @@ import {
   Trash2,
   FileText,
   Download,
+  Eye,
   Folder as FolderIcon,
   FolderPlus,
   ChevronRight,
@@ -31,6 +32,11 @@ import { formatDateTime } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/shared/empty-state";
+import {
+  FileViewer,
+  isViewable,
+  type ViewableFile,
+} from "@/components/shared/file-viewer";
 import {
   Dialog,
   DialogContent,
@@ -89,6 +95,16 @@ export function FilesManager({
   const [newName, setNewName] = useState("");
   const [renaming, setRenaming] = useState<Folder | null>(null);
   const [renameName, setRenameName] = useState("");
+  const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
+
+  function openViewer(file: AttachmentWithUrl) {
+    if (!file.signed_url) return;
+    setViewerFile({
+      url: file.signed_url,
+      fileName: file.file_name,
+      mimeType: file.mime_type,
+    });
+  }
 
   async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -309,23 +325,31 @@ export function FilesManager({
 
           {files.map((file) => {
             const isImage = file.mime_type?.startsWith("image/");
+            const viewable = isViewable(file.mime_type) && !!file.signed_url;
             return (
               <div
                 key={file.id}
                 className="flex items-center gap-3 rounded-lg border p-3"
               >
-                {isImage && file.signed_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={file.signed_url}
-                    alt={file.file_name}
-                    className="size-10 shrink-0 rounded object-cover"
-                  />
-                ) : (
-                  <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded">
-                    <FileText className="text-muted-foreground size-5" />
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => viewable && openViewer(file)}
+                  className={`shrink-0 ${viewable ? "cursor-pointer" : "cursor-default"}`}
+                  aria-label={viewable ? `Preview ${file.file_name}` : undefined}
+                >
+                  {isImage && file.signed_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={file.signed_url}
+                      alt={file.file_name}
+                      className="size-10 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="bg-muted flex size-10 items-center justify-center rounded">
+                      <FileText className="text-muted-foreground size-5" />
+                    </div>
+                  )}
+                </button>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
                     {file.file_name}
@@ -336,6 +360,17 @@ export function FilesManager({
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
+                  {viewable && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      onClick={() => openViewer(file)}
+                      aria-label="Preview"
+                    >
+                      <Eye className="size-3.5" />
+                    </Button>
+                  )}
                   {file.signed_url && (
                     <Button
                       size="icon"
@@ -434,6 +469,11 @@ export function FilesManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <FileViewer
+        file={viewerFile}
+        onOpenChange={(open) => !open && setViewerFile(null)}
+      />
     </div>
   );
 }
