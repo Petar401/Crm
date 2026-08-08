@@ -218,6 +218,37 @@ export interface Folder {
   updated_at: string;
 }
 
+export type InvoiceDocType = "invoice" | "receipt" | "other";
+
+export interface InvoiceFolder {
+  id: string;
+  workspace_id: string;
+  parent_id: string | null;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Invoice {
+  id: string;
+  workspace_id: string;
+  folder_id: string | null;
+  doc_type: InvoiceDocType;
+  vendor: string | null;
+  amount: number | null;
+  currency: string | null;
+  invoice_date: string | null;
+  file_name: string;
+  storage_bucket: string;
+  storage_path: string;
+  mime_type: string | null;
+  file_size: number | null;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type CampaignFrequency = "manual" | "daily" | "weekly";
 export type LeadStatus = "pending" | "approved" | "rejected" | "converted";
 

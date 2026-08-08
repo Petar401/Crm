@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Trash2, FileText, Download } from "lucide-react";
+import { Upload, Trash2, FileText, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
@@ -16,6 +16,11 @@ import { ATTACHMENT_BUCKET } from "@/features/attachments/constants";
 import { formatDateTime } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
+import {
+  FileViewer,
+  isViewable,
+  type ViewableFile,
+} from "@/components/shared/file-viewer";
 
 interface FilesPanelProps {
   attachments: AttachmentWithUrl[];
@@ -44,6 +49,16 @@ export function FilesPanel({
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
+
+  function openViewer(file: AttachmentWithUrl) {
+    if (!file.signed_url) return;
+    setViewerFile({
+      url: file.signed_url,
+      fileName: file.file_name,
+      mimeType: file.mime_type,
+    });
+  }
 
   async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -123,23 +138,31 @@ export function FilesPanel({
         <div className="grid gap-3 sm:grid-cols-2">
           {attachments.map((file) => {
             const isImage = file.mime_type?.startsWith("image/");
+            const viewable = isViewable(file.mime_type) && !!file.signed_url;
             return (
               <div
                 key={file.id}
                 className="flex items-center gap-3 rounded-md border p-3"
               >
-                {isImage && file.signed_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={file.signed_url}
-                    alt={file.file_name}
-                    className="size-12 shrink-0 rounded object-cover"
-                  />
-                ) : (
-                  <div className="bg-muted flex size-12 shrink-0 items-center justify-center rounded">
-                    <FileText className="text-muted-foreground size-5" />
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => viewable && openViewer(file)}
+                  className={`shrink-0 ${viewable ? "cursor-pointer" : "cursor-default"}`}
+                  aria-label={viewable ? `Preview ${file.file_name}` : undefined}
+                >
+                  {isImage && file.signed_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={file.signed_url}
+                      alt={file.file_name}
+                      className="size-12 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="bg-muted flex size-12 items-center justify-center rounded">
+                      <FileText className="text-muted-foreground size-5" />
+                    </div>
+                  )}
+                </button>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
                     {file.file_name}
@@ -150,6 +173,17 @@ export function FilesPanel({
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
+                  {viewable && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      onClick={() => openViewer(file)}
+                      aria-label="Preview"
+                    >
+                      <Eye className="size-3.5" />
+                    </Button>
+                  )}
                   {file.signed_url && (
                     <Button size="icon" variant="ghost" className="size-7" asChild>
                       <a
@@ -177,6 +211,11 @@ export function FilesPanel({
           })}
         </div>
       )}
+
+      <FileViewer
+        file={viewerFile}
+        onOpenChange={(open) => !open && setViewerFile(null)}
+      />
     </div>
   );
 }
