@@ -35,7 +35,7 @@ export function Sidebar({ allowed }: { allowed: PermissionKey[] }) {
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_rgba(0,255,231,0.28),0_0_20px_rgba(0,255,231,0.07)]"
                   : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
               )}
             >

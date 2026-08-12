@@ -49,7 +49,10 @@ export function PipelineFunnel({
                     <div className="flex min-w-0 items-center gap-2">
                       <span
                         className="size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: color }}
+                        style={{
+                          backgroundColor: color,
+                          boxShadow: `0 0 12px ${color}`,
+                        }}
                       />
                       <span className="truncate">{stage.name}</span>
                       <Badge variant="secondary">{count}</Badge>
@@ -61,7 +64,11 @@ export function PipelineFunnel({
                   <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
                     <div
                       className="h-full rounded-full"
-                      style={{ width, backgroundColor: color }}
+                      style={{
+                        width,
+                        backgroundColor: color,
+                        boxShadow: `0 0 12px ${color}`,
+                      }}
                     />
                   </div>
                 </div>
