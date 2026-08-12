@@ -5,7 +5,6 @@ import { LogOut, KeyRound } from "lucide-react";
 
 import { signOutAction } from "@/features/auth/actions";
 import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
-import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import type { PermissionKey } from "@/lib/constants/permissions";
 import { Button } from "@/components/ui/button";
@@ -55,7 +54,6 @@ export function Topbar({
         <p className="truncate text-sm font-semibold">{workspaceName}</p>
       </div>
       <div className="flex items-center gap-1">
-        <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">

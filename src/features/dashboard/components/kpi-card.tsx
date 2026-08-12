@@ -56,14 +56,14 @@ export function KpiCard({
         <div className="min-w-0">
           <p className="text-muted-foreground text-sm">{label}</p>
           <div className="mt-1 flex items-baseline gap-2">
-            <p className="text-2xl font-semibold">{value}</p>
+            <p className="font-mono text-2xl font-semibold">{value}</p>
             {trend !== undefined && <TrendDelta pct={trend ?? null} />}
           </div>
           {sub && (
             <p className="text-muted-foreground mt-1 truncate text-xs">{sub}</p>
           )}
         </div>
-        <div className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
+        <div className="text-primary flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border)]">
           <Icon className="size-5" />
         </div>
       </CardContent>
