@@ -62,14 +62,14 @@ export async function sendAriaMessage(
   const ctx = await requireAuthContext();
   await requirePermission("ai.use");
 
-  const crmJson = await getCrmContext(ctx.workspace.id);
+  const crm = await getCrmContext(ctx.workspace.id);
 
   const seedHistory: GeminiHistoryItem[] = [
     {
       role: "user",
       parts: [
         {
-          text: `Here is the current CRM data for your workspace:\n\n${crmJson}`,
+          text: `Here is the current CRM data for your workspace:\n\n${crm.json}`,
         },
       ],
     },
@@ -119,8 +119,34 @@ export async function sendAriaMessage(
     }
   }
 
+  // Read-on-demand: Aria calls read_workspace_file(id) to open a listed file
+  // or invoice. Resolve the id against the snapshot, download it, extract text.
+  const readFile = async (id: string): Promise<string> => {
+    const ref = crm.files.get(id);
+    if (!ref) {
+      return `[No file or invoice with id "${id}" exists in this workspace.]`;
+    }
+    if ((ref.mime_type || "").toLowerCase().startsWith("image/")) {
+      return `["${ref.file_name}" is an image. Ask the user to attach it to the chat so it can be viewed.]`;
+    }
+    const supabase = await createClient();
+    const { data, error } = await supabase.storage
+      .from(ref.storage_bucket)
+      .download(ref.storage_path);
+    if (error || !data) {
+      return `[Could not download "${ref.file_name}".]`;
+    }
+    const bytes = new Uint8Array(await data.arrayBuffer());
+    return extractTextFromFile(bytes, ref.mime_type ?? "", ref.file_name);
+  };
+
   try {
-    const message = await runAriaChat(seedHistory, geminiHistory, newParts);
+    const message = await runAriaChat(
+      seedHistory,
+      geminiHistory,
+      newParts,
+      readFile
+    );
     return { message };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Aria request failed." };
