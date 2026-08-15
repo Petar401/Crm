@@ -28,7 +28,9 @@ function getKey(): Buffer {
  */
 export function encryptSecret(plaintext: string): string {
   const iv = randomBytes(IV_LENGTH);
-  const cipher = createCipheriv(ALGORITHM, getKey(), iv);
+  const cipher = createCipheriv(ALGORITHM, getKey(), iv, {
+    authTagLength: AUTH_TAG_LENGTH,
+  });
   const ciphertext = Buffer.concat([
     cipher.update(plaintext, "utf8"),
     cipher.final(),
@@ -45,7 +47,9 @@ export function decryptSecret(blob: string): string {
   const authTag = raw.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
   const ciphertext = raw.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
 
-  const decipher = createDecipheriv(ALGORITHM, getKey(), iv);
+  const decipher = createDecipheriv(ALGORITHM, getKey(), iv, {
+    authTagLength: AUTH_TAG_LENGTH,
+  });
   decipher.setAuthTag(authTag);
   return Buffer.concat([
     decipher.update(ciphertext),
