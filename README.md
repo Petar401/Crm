@@ -78,10 +78,11 @@ Copy `.env.example` to `.env.local` and fill in your values:
 NEXT_PUBLIC_SUPABASE_URL=        # Project URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=   # anon/public key
 SUPABASE_SERVICE_ROLE_KEY=       # service role key (server-only)
-GEMINI_API_KEY=                  # optional; enables AI features
+GROQ_API_KEY=                    # optional; default AI key (workspaces can set their own)
+AI_KEY_ENCRYPTION_SECRET=        # optional; required if workspaces set their own AI key
 ```
 
-Only `NEXT_PUBLIC_*` values are exposed to the browser. The service-role and Gemini keys
+Only `NEXT_PUBLIC_*` values are exposed to the browser. The service-role and Groq keys
 stay on the server.
 
 ### 3. Run

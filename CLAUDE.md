@@ -22,8 +22,8 @@ A multi-user CRM (Next.js App Router + Supabase). See `README.md` for the full o
   - Database: RLS policies + `has_permission(workspace_id, key)` (see `supabase/migrations/0005_rls.sql`).
   - App: `requirePermission(key)` in every mutating server action; `getPermissionSet()`/`allowed`
     for conditional UI. Permission keys are in `src/lib/constants/permissions.ts`.
-- **Secrets are server-only.** Never import `lib/supabase/admin.ts` or use `GEMINI_API_KEY` in
-  client code. Only `NEXT_PUBLIC_*` env vars may reach the browser.
+- **Secrets are server-only.** Never import `lib/supabase/admin.ts` or use `GROQ_API_KEY` /
+  `AI_KEY_ENCRYPTION_SECRET` in client code. Only `NEXT_PUBLIC_*` env vars may reach the browser.
 - **Auth context:** `requireAuthContext()` (`src/lib/auth/session.ts`) gives `{ userId, email,
   profile, workspace, member }` and redirects to `/login` or `/onboarding` as needed.
 

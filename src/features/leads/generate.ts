@@ -2,7 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { generateText, isAiConfigured } from "@/features/ai/gemini";
+import { generateText } from "@/features/ai/groq";
+import { resolveGroqApiKey } from "@/features/ai/settings-queries";
 import type { LeadCampaign } from "@/lib/db/types";
 import { safeFetchText } from "@/lib/utils/safe-fetch";
 import { searchBusinesses, type OverpassBusiness } from "./overpass";
@@ -67,7 +68,8 @@ async function scoreAndEnrich(
   campaign: LeadCampaign,
   siteText: string | null
 ): Promise<Enrichment> {
-  if (!isAiConfigured()) {
+  const apiKey = await resolveGroqApiKey(campaign.workspace_id);
+  if (!apiKey) {
     return {
       score: null,
       reason: null,
@@ -102,7 +104,8 @@ async function scoreAndEnrich(
   try {
     const raw = await generateText(
       prompt,
-      "You are a B2B sales research assistant. Output strict JSON only. Never invent facts."
+      "You are a B2B sales research assistant. Output strict JSON only. Never invent facts.",
+      apiKey
     );
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return emptyEnrichment();

@@ -4,7 +4,7 @@ import { ArrowLeft, Building2 } from "lucide-react";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
-import { isAiConfigured } from "@/features/ai/gemini";
+import { isAiConfigured } from "@/features/ai/settings-queries";
 import { getDeal, getStages } from "@/features/deals/queries";
 import { getNotes } from "@/features/notes/queries";
 import { getEntityAttachments } from "@/features/attachments/queries";
@@ -42,7 +42,7 @@ export default async function DealDetailPage({
   if (!deal) notFound();
 
   const stageName = stages.find((s) => s.id === deal.stage_id)?.name ?? "—";
-  const aiEnabled = isAiConfigured() && allowed.has("ai.use");
+  const aiEnabled = (await isAiConfigured(workspaceId)) && allowed.has("ai.use");
 
   return (
     <div>
