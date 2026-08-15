@@ -27,6 +27,8 @@ export async function saveAiApiKey(values: unknown): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.from("workspace_ai_settings").upsert({
     workspace_id: ctx.workspace.id,
+    provider: parsed.data.provider,
+    model: parsed.data.model || null,
     encrypted_api_key,
     key_preview,
     updated_by: ctx.userId,

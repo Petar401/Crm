@@ -320,10 +320,14 @@ export interface MemberPermissionOverride {
   allowed: boolean;
 }
 
+export type AiProvider = "groq" | "openrouter";
+
 export interface WorkspaceAiSettings {
   workspace_id: string;
   encrypted_api_key: string;
   key_preview: string;
+  provider: AiProvider;
+  model: string | null;
   updated_by: string | null;
   updated_at: string;
 }

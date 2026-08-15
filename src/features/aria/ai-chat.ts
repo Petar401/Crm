@@ -1,9 +1,10 @@
 import "server-only";
 
-import Groq from "groq-sdk";
+import type Groq from "groq-sdk";
 
-const TEXT_MODEL = "llama-3.3-70b-versatile";
-const VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+import { createAiClient } from "@/features/ai/client";
+import { AI_PROVIDERS } from "@/features/ai/providers";
+import type { AiCredentials } from "@/features/ai/settings-queries";
 
 /** Safety bound on the tool-calling loop (read_workspace_file rounds). */
 const MAX_TOOL_ROUNDS = 4;
@@ -61,13 +62,18 @@ export async function runAriaChat(
   conversationHistory: GeminiHistoryItem[],
   newParts: ChatPart[],
   readFile: FileReader,
-  apiKey: string
+  credentials: AiCredentials
 ): Promise<string> {
   const allHistory = [...seedHistory, ...conversationHistory];
   const hasImages = newParts.some(
     (p) => p.inlineData?.mimeType.startsWith("image/")
   );
-  const model = hasImages ? VISION_MODEL : TEXT_MODEL;
+  const providerConfig = AI_PROVIDERS[credentials.provider];
+  const model =
+    credentials.model ??
+    (hasImages && providerConfig.visionModel
+      ? providerConfig.visionModel
+      : providerConfig.defaultModel);
 
   // Convert history to Groq's OpenAI-compatible format.
   // "model" role in our interface maps to "assistant" in Groq/OpenAI.
@@ -104,9 +110,9 @@ export async function runAriaChat(
     },
   ];
 
-  const groq = new Groq({ apiKey });
+  const client = createAiClient(credentials.provider, credentials.apiKey);
 
-  let completion = await groq.chat.completions.create({
+  let completion = await client.chat.completions.create({
     model,
     messages,
     tools: TOOLS,
@@ -147,7 +153,7 @@ export async function runAriaChat(
       });
     }
 
-    completion = await groq.chat.completions.create({
+    completion = await client.chat.completions.create({
       model,
       messages,
       tools: TOOLS,
