@@ -60,11 +60,9 @@ export async function runAriaChat(
   seedHistory: GeminiHistoryItem[],
   conversationHistory: GeminiHistoryItem[],
   newParts: ChatPart[],
-  readFile: FileReader
+  readFile: FileReader,
+  apiKey: string
 ): Promise<string> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error("AI is not configured.");
-
   const allHistory = [...seedHistory, ...conversationHistory];
   const hasImages = newParts.some(
     (p) => p.inlineData?.mimeType.startsWith("image/")

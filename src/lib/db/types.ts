@@ -319,3 +319,11 @@ export interface MemberPermissionOverride {
   permission_key: string;
   allowed: boolean;
 }
+
+export interface WorkspaceAiSettings {
+  workspace_id: string;
+  encrypted_api_key: string;
+  key_preview: string;
+  updated_by: string | null;
+  updated_at: string;
+}

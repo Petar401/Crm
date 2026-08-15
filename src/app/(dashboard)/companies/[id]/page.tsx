@@ -4,7 +4,7 @@ import { ArrowLeft, Globe, Mail, Phone, MapPin } from "lucide-react";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
-import { isAiConfigured } from "@/features/ai/gemini";
+import { isAiConfigured } from "@/features/ai/settings-queries";
 import {
   getCompany,
   getCompanyContacts,
@@ -62,7 +62,7 @@ export default async function CompanyDetailPage({
   ]);
   if (!company) notFound();
 
-  const aiEnabled = isAiConfigured() && allowed.has("ai.use");
+  const aiEnabled = (await isAiConfigured(workspaceId)) && allowed.has("ai.use");
 
   return (
     <div>

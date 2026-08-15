@@ -2,10 +2,10 @@
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
-import { isAiConfigured } from "@/features/ai/gemini";
+import { resolveGroqApiKey } from "@/features/ai/settings-queries";
 import { extractTextFromFile } from "@/features/ai/extract-text";
-import { runAriaChat } from "@/features/aria/gemini-chat";
-import type { GeminiHistoryItem, ChatPart } from "@/features/aria/gemini-chat";
+import { runAriaChat } from "@/features/aria/groq-chat";
+import type { GeminiHistoryItem, ChatPart } from "@/features/aria/groq-chat";
 import { getCrmContext } from "@/features/aria/queries";
 import { getAttachmentsByIds } from "@/features/attachments/queries";
 import { ATTACHMENT_BUCKET } from "@/features/attachments/constants";
@@ -53,14 +53,15 @@ export async function sendAriaMessage(
   attachments?: AttachmentInput[],
   workspaceFileIds?: string[]
 ): Promise<AriaResult> {
-  if (!isAiConfigured()) {
-    return {
-      error: "AI is not configured. Add a GROQ_API_KEY to enable Aria.",
-    };
-  }
-
   const ctx = await requireAuthContext();
   await requirePermission("ai.use");
+
+  const apiKey = await resolveGroqApiKey(ctx.workspace.id);
+  if (!apiKey) {
+    return {
+      error: "AI is not configured. Add an API key in Settings.",
+    };
+  }
 
   const crm = await getCrmContext(ctx.workspace.id);
 
@@ -145,7 +146,8 @@ export async function sendAriaMessage(
       seedHistory,
       geminiHistory,
       newParts,
-      readFile
+      readFile,
+      apiKey
     );
     return { message };
   } catch (e) {

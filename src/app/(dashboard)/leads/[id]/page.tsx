@@ -4,7 +4,7 @@ import { ArrowLeft, Building2, User } from "lucide-react";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
-import { isAiConfigured } from "@/features/ai/gemini";
+import { isAiConfigured } from "@/features/ai/settings-queries";
 import { getLead } from "@/features/leads/queries";
 import { getMemberOptions } from "@/features/team/queries";
 import { getStages } from "@/features/deals/queries";
@@ -51,7 +51,7 @@ export default async function LeadDetailPage({
     ]);
   if (!lead) notFound();
 
-  const aiEnabled = isAiConfigured() && allowed.has("ai.use");
+  const aiEnabled = (await isAiConfigured(workspaceId)) && allowed.has("ai.use");
   const ownerName =
     members.find((m) => m.userId === lead.owner_user_id)?.name ?? "Unassigned";
   const tier = scoreTier(lead.match_score);

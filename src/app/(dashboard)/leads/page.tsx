@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
-import { isAiConfigured } from "@/features/ai/gemini";
+import { isAiConfigured } from "@/features/ai/settings-queries";
 import { getCampaigns, getLeads } from "@/features/leads/queries";
 import { getMemberOptions } from "@/features/team/queries";
 import { getStages } from "@/features/deals/queries";
@@ -24,7 +24,7 @@ export default async function LeadsPage() {
     getMemberOptions(ctx.workspace.id),
     getStages(ctx.workspace.id),
   ]);
-  const aiEnabled = isAiConfigured() && allowed.has("ai.use");
+  const aiEnabled = (await isAiConfigured(ctx.workspace.id)) && allowed.has("ai.use");
 
   return (
     <div className="space-y-8">

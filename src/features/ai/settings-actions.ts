@@ -1,0 +1,56 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { createClient } from "@/lib/supabase/server";
+import { requireAuthContext } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/permissions";
+import { encryptSecret } from "@/lib/security/secret-box";
+import { saveAiApiKeySchema } from "@/features/ai/settings-schemas";
+
+export interface ActionResult {
+  error?: string;
+}
+
+export async function saveAiApiKey(values: unknown): Promise<ActionResult> {
+  const parsed = saveAiApiKeySchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const ctx = await requireAuthContext();
+  await requirePermission("settings.update");
+
+  const encrypted_api_key = encryptSecret(parsed.data.apiKey);
+  const key_preview = parsed.data.apiKey.slice(-4);
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("workspace_ai_settings").upsert({
+    workspace_id: ctx.workspace.id,
+    encrypted_api_key,
+    key_preview,
+    updated_by: ctx.userId,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/settings");
+  return {};
+}
+
+export async function clearAiApiKey(): Promise<ActionResult> {
+  const ctx = await requireAuthContext();
+  await requirePermission("settings.update");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("workspace_ai_settings")
+    .delete()
+    .eq("workspace_id", ctx.workspace.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/settings");
+  return {};
+}

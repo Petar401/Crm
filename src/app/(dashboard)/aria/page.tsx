@@ -2,7 +2,7 @@ import nextDynamic from "next/dynamic";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
-import { isAiConfigured } from "@/features/ai/gemini";
+import { isAiConfigured } from "@/features/ai/settings-queries";
 import { PageHeader } from "@/components/shared/page-header";
 
 // AriaChat carries the streaming chat client, its markdown renderer and any
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function AriaPage() {
   const ctx = await requireAuthContext();
   const { allowed } = await getPermissionSet();
-  const aiEnabled = isAiConfigured() && allowed.has("ai.use");
+  const aiEnabled = (await isAiConfigured(ctx.workspace.id)) && allowed.has("ai.use");
 
   return (
     <div className="flex h-full flex-col">

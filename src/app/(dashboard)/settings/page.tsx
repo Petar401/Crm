@@ -7,7 +7,12 @@ import { getPermissionSet } from "@/lib/auth/permissions";
 import { getMembers } from "@/features/team/queries";
 import { getApiTokens } from "@/features/api-tokens/queries";
 import { ConnectorsPanel } from "@/features/api-tokens/components/connectors-panel";
-import { isAiConfigured } from "@/features/ai/gemini";
+import {
+  isAiConfigured,
+  getWorkspaceAiSettings,
+  hasEnvFallbackKey,
+} from "@/features/ai/settings-queries";
+import { AiKeySettings } from "@/features/ai/components/ai-key-settings";
 import { TeamSettings } from "@/features/team/components/team-settings";
 import { InviteMemberDialog } from "@/features/team/components/invite-member-dialog";
 import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
@@ -27,8 +32,13 @@ export default async function SettingsPage() {
   const canInvite = allowed.has("team.invite");
   const canEditRoles = allowed.has("team.edit_roles");
   const canManageTokens = allowed.has("settings.tokens");
+  const canManageAiKey = allowed.has("settings.update");
 
-  const tokens = canManageTokens ? await getApiTokens(ctx.member.id) : [];
+  const [tokens, aiConfigured, aiSettings] = await Promise.all([
+    canManageTokens ? getApiTokens(ctx.member.id) : Promise.resolve([]),
+    isAiConfigured(ctx.workspace.id),
+    canManageAiKey ? getWorkspaceAiSettings(ctx.workspace.id) : Promise.resolve(null),
+  ]);
   const headerList = await headers();
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL ??
@@ -59,7 +69,7 @@ export default async function SettingsPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">AI features</span>
-              {isAiConfigured() ? (
+              {aiConfigured ? (
                 <Badge variant="secondary">Enabled</Badge>
               ) : (
                 <Badge variant="outline">Not configured</Badge>
@@ -67,6 +77,17 @@ export default async function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {canManageAiKey && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">AI API key</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AiKeySettings settings={aiSettings} hasEnvFallback={hasEnvFallbackKey()} />
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
