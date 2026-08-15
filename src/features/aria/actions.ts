@@ -2,10 +2,10 @@
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
-import { resolveGroqApiKey } from "@/features/ai/settings-queries";
+import { resolveAiCredentials } from "@/features/ai/settings-queries";
 import { extractTextFromFile } from "@/features/ai/extract-text";
-import { runAriaChat } from "@/features/aria/groq-chat";
-import type { GeminiHistoryItem, ChatPart } from "@/features/aria/groq-chat";
+import { runAriaChat } from "@/features/aria/ai-chat";
+import type { GeminiHistoryItem, ChatPart } from "@/features/aria/ai-chat";
 import { getCrmContext } from "@/features/aria/queries";
 import { getAttachmentsByIds } from "@/features/attachments/queries";
 import { ATTACHMENT_BUCKET } from "@/features/attachments/constants";
@@ -56,8 +56,8 @@ export async function sendAriaMessage(
   const ctx = await requireAuthContext();
   await requirePermission("ai.use");
 
-  const apiKey = await resolveGroqApiKey(ctx.workspace.id);
-  if (!apiKey) {
+  const credentials = await resolveAiCredentials(ctx.workspace.id);
+  if (!credentials) {
     return {
       error: "AI is not configured. Add an API key in Settings.",
     };
@@ -147,7 +147,7 @@ export async function sendAriaMessage(
       geminiHistory,
       newParts,
       readFile,
-      apiKey
+      credentials
     );
     return { message };
   } catch (e) {

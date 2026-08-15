@@ -12,6 +12,7 @@ import {
   getWorkspaceAiSettings,
   hasEnvFallbackKey,
 } from "@/features/ai/settings-queries";
+import { listOpenRouterFreeModels } from "@/features/ai/openrouter-models";
 import { AiKeySettings } from "@/features/ai/components/ai-key-settings";
 import { TeamSettings } from "@/features/team/components/team-settings";
 import { InviteMemberDialog } from "@/features/team/components/invite-member-dialog";
@@ -34,10 +35,11 @@ export default async function SettingsPage() {
   const canManageTokens = allowed.has("settings.tokens");
   const canManageAiKey = allowed.has("settings.update");
 
-  const [tokens, aiConfigured, aiSettings] = await Promise.all([
+  const [tokens, aiConfigured, aiSettings, openRouterModels] = await Promise.all([
     canManageTokens ? getApiTokens(ctx.member.id) : Promise.resolve([]),
     isAiConfigured(ctx.workspace.id),
     canManageAiKey ? getWorkspaceAiSettings(ctx.workspace.id) : Promise.resolve(null),
+    canManageAiKey ? listOpenRouterFreeModels() : Promise.resolve([]),
   ]);
   const headerList = await headers();
   const origin =
@@ -84,7 +86,11 @@ export default async function SettingsPage() {
               <CardTitle className="text-base">AI API key</CardTitle>
             </CardHeader>
             <CardContent>
-              <AiKeySettings settings={aiSettings} hasEnvFallback={hasEnvFallbackKey()} />
+              <AiKeySettings
+                settings={aiSettings}
+                hasEnvFallback={hasEnvFallbackKey()}
+                openRouterModels={openRouterModels}
+              />
             </CardContent>
           </Card>
         )}
