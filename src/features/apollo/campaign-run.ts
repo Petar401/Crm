@@ -159,56 +159,93 @@ export async function runApolloCampaign(
     })
     .slice(0, campaign.max_results);
 
+  // Enrichment (Apollo) + AI scoring are both per-lead network calls; running
+  // them one at a time made a full campaign (up to 100 leads) slow enough to
+  // risk exceeding the route's execution budget. Process in small concurrent
+  // batches instead — inserts stay sequential per batch so a failure partway
+  // through still stops the run at a well-defined point.
+  const BATCH_SIZE = 5;
   let count = 0;
   let stoppedEarly = false;
+  let unauthorizedError: string | null = null;
 
-  for (const person of fresh) {
-    let enriched: ApolloPerson | null;
-    try {
-      enriched = await enrichPerson(apiKey, {
-        email: person.email ?? undefined,
-        firstName: person.first_name ?? undefined,
-        lastName: person.last_name ?? undefined,
-        organizationName: person.organization?.name ?? undefined,
-        domain: normalizeHost(person.organization?.website_url ?? null) ?? undefined,
-      });
-    } catch (e) {
-      if (e instanceof ApolloApiError && e.kind === "unauthorized") {
-        await markCampaignRun(supabase, campaign.id, "error", count);
-        return { count, scanned: people.length, error: "Apollo rejected the API key." };
+  batches: for (let i = 0; i < fresh.length; i += BATCH_SIZE) {
+    const batch = fresh.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(async (person) => {
+        try {
+          const enriched = await enrichPerson(apiKey, {
+            email: person.email ?? undefined,
+            firstName: person.first_name ?? undefined,
+            lastName: person.last_name ?? undefined,
+            organizationName: person.organization?.name ?? undefined,
+            domain:
+              normalizeHost(person.organization?.website_url ?? null) ??
+              undefined,
+          });
+          const contact = enriched ?? person;
+          const { score, reason } = await scoreApolloLead(contact, campaign);
+          return { person, enriched, contact, score, reason, error: null as ApolloApiError | Error | null };
+        } catch (e) {
+          return {
+            person,
+            enriched: null,
+            contact: null,
+            score: null,
+            reason: null,
+            error: e instanceof Error ? e : new Error("Enrichment failed."),
+          };
+        }
+      })
+    );
+
+    let batchFailed = false;
+    for (const result of batchResults) {
+      if (result.error) {
+        if (result.error instanceof ApolloApiError && result.error.kind === "unauthorized") {
+          unauthorizedError = "Apollo rejected the API key.";
+        }
+        // Out of credits or any other enrichment failure: stop importing
+        // further leads this run, keep whatever already succeeded.
+        batchFailed = true;
+        continue;
       }
-      // Out of credits or any other enrichment failure: stop importing
-      // further leads this run, keep whatever already succeeded.
-      stoppedEarly = true;
-      break;
+
+      const { person, enriched, contact, score, reason } = result;
+      if (score! < (campaign.min_score ?? 0)) continue;
+
+      const { error } = await supabase.from("leads").insert({
+        workspace_id: campaign.workspace_id,
+        campaign_id: campaign.id,
+        company_name: contact!.organization?.name ?? contact!.name ?? "Unknown",
+        website: contact!.organization?.website_url ?? null,
+        industry: contact!.organization?.industry ?? null,
+        city: contact!.organization?.city ?? contact!.city,
+        country: contact!.organization?.country ?? contact!.country,
+        contact_name: contact!.name,
+        contact_email: contact!.email,
+        contact_phone: contact!.phone_numbers?.[0]?.raw_number ?? null,
+        job_title: contact!.title,
+        source: "apollo",
+        source_ref: `apollo:${person.id}`,
+        match_score: score,
+        match_reason: reason,
+        status: "pending",
+        owner_user_id: actorUserId,
+        created_by: actorUserId,
+        raw: { search: person, enrichment: enriched },
+      });
+      if (!error) count += 1;
     }
 
-    const contact = enriched ?? person;
-    const { score, reason } = await scoreApolloLead(contact, campaign);
-    if (score < (campaign.min_score ?? 0)) continue;
-
-    const { error } = await supabase.from("leads").insert({
-      workspace_id: campaign.workspace_id,
-      campaign_id: campaign.id,
-      company_name: contact.organization?.name ?? contact.name ?? "Unknown",
-      website: contact.organization?.website_url ?? null,
-      industry: contact.organization?.industry ?? null,
-      city: contact.organization?.city ?? contact.city,
-      country: contact.organization?.country ?? contact.country,
-      contact_name: contact.name,
-      contact_email: contact.email,
-      contact_phone: contact.phone_numbers?.[0]?.raw_number ?? null,
-      job_title: contact.title,
-      source: "apollo",
-      source_ref: `apollo:${person.id}`,
-      match_score: score,
-      match_reason: reason,
-      status: "pending",
-      owner_user_id: actorUserId,
-      created_by: actorUserId,
-      raw: { search: person, enrichment: enriched },
-    });
-    if (!error) count += 1;
+    if (unauthorizedError) {
+      await markCampaignRun(supabase, campaign.id, "error", count);
+      return { count, scanned: people.length, error: unauthorizedError };
+    }
+    if (batchFailed) {
+      stoppedEarly = true;
+      break batches;
+    }
   }
 
   await markCampaignRun(supabase, campaign.id, stoppedEarly ? "partial" : "ok", count);

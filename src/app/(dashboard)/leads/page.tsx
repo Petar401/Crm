@@ -15,6 +15,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
+// Apollo campaign runs hit external APIs + per-lead AI calls; give the
+// Server Action invoked from this page the same budget as the cron path
+// (src/app/api/cron/leads/route.ts).
+export const maxDuration = 300;
 
 export default async function LeadsPage() {
   const ctx = await requireAuthContext();
