@@ -56,6 +56,8 @@ export function LeadForm({ open, onOpenChange, members, lead }: LeadFormProps) {
       email: lead?.email ?? "",
       phone: lead?.phone ?? "",
       address_line_1: lead?.address_line_1 ?? "",
+      state: lead?.state ?? "",
+      postal_code: lead?.postal_code ?? "",
       city: lead?.city ?? "",
       country: lead?.country ?? "",
       industry: lead?.industry ?? "",
@@ -187,6 +189,34 @@ export function LeadForm({ open, onOpenChange, members, lead }: LeadFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>City</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="state"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>State</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="postal_code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Postal code</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>

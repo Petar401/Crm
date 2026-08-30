@@ -12,9 +12,14 @@ export type SaveApolloApiKeyInput = z.infer<typeof saveApolloApiKeySchema>;
 
 export const apolloSearchSchema = z.object({
   personTitles: z.string().trim().optional().or(z.literal("")),
+  personSeniorities: z.string().trim().optional().or(z.literal("")),
   organizationName: z.string().trim().optional().or(z.literal("")),
-  organizationDomain: z.string().trim().optional().or(z.literal("")),
-  location: z.string().trim().optional().or(z.literal("")),
+  organizationDomains: z.string().trim().optional().or(z.literal("")),
+  locations: z.string().trim().optional().or(z.literal("")),
+  keywords: z.string().trim().optional().or(z.literal("")),
+  employeeRanges: z.string().trim().optional().or(z.literal("")),
+  excludeTitles: z.string().trim().optional().or(z.literal("")),
+  excludeDomains: z.string().trim().optional().or(z.literal("")),
 });
 
 export type ApolloSearchInput = z.infer<typeof apolloSearchSchema>;

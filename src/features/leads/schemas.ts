@@ -64,6 +64,8 @@ export const leadSchema = z.object({
   email: z.string().trim().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().trim().optional().or(z.literal("")),
   address_line_1: z.string().trim().optional().or(z.literal("")),
+  state: z.string().trim().optional().or(z.literal("")),
+  postal_code: z.string().trim().optional().or(z.literal("")),
   city: z.string().trim().optional().or(z.literal("")),
   country: z.string().trim().optional().or(z.literal("")),
   industry: z.string().trim().optional().or(z.literal("")),
