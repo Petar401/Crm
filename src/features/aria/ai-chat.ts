@@ -1,6 +1,6 @@
 import "server-only";
 
-import type Groq from "groq-sdk";
+import type OpenAI from "openai";
 
 import { createAiClient } from "@/features/ai/client";
 import { AI_PROVIDERS } from "@/features/ai/providers";
@@ -21,7 +21,7 @@ The workspace also runs an automated lead finder that discovers new businesses a
 
 Be concise, professional, and actionable. Write in clear British English. When referencing CRM data, cite the specific records you draw from. Never invent facts — only use what is in the provided context or files you have read; in particular, never invent a contact's name.`;
 
-const TOOLS: Groq.Chat.ChatCompletionTool[] = [
+const TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
@@ -77,7 +77,7 @@ export async function runAriaChat(
 
   // Convert history to Groq's OpenAI-compatible format.
   // "model" role in our interface maps to "assistant" in Groq/OpenAI.
-  const historyMessages: Groq.Chat.ChatCompletionMessageParam[] = allHistory.map(
+  const historyMessages: OpenAI.Chat.ChatCompletionMessageParam[] = allHistory.map(
     (item) => ({
       role: item.role === "model" ? ("assistant" as const) : ("user" as const),
       content: item.parts.map((p) => p.text ?? "").join(""),
@@ -85,7 +85,7 @@ export async function runAriaChat(
   );
 
   // Build the new user message content (text-only or multimodal)
-  const newContent: Groq.Chat.ChatCompletionContentPart[] = newParts.map(
+  const newContent: OpenAI.Chat.ChatCompletionContentPart[] = newParts.map(
     (p) => {
       if (p.inlineData) {
         return {
@@ -99,7 +99,7 @@ export async function runAriaChat(
     }
   );
 
-  const messages: Groq.Chat.ChatCompletionMessageParam[] = [
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: SYSTEM_INSTRUCTION },
     ...historyMessages,
     {
@@ -132,8 +132,18 @@ export async function runAriaChat(
       `Aria: chat completion with tools failed for model "${model}", retrying without tools:`,
       e
     );
+    try {
+      completion = await client.chat.completions.create({ model, messages });
+    } catch (e2) {
+      console.error(
+        `Aria: retry without tools also failed for model "${model}":`,
+        e2
+      );
+      throw new Error(
+        `The model "${model}" is unavailable or invalid. Pick a different model in Settings.`
+      );
+    }
     toolsEnabled = false;
-    completion = await client.chat.completions.create({ model, messages });
   }
 
   if (!completion.choices?.length) {
@@ -158,7 +168,9 @@ export async function runAriaChat(
 
     for (const call of choice.tool_calls) {
       let result: string;
-      if (call.function.name === "read_workspace_file") {
+      if (call.type !== "function") {
+        result = `[Unsupported tool call type: ${call.type}.]`;
+      } else if (call.function.name === "read_workspace_file") {
         try {
           const args = JSON.parse(call.function.arguments || "{}");
           const id = String(args.id ?? "").trim();
