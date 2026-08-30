@@ -132,8 +132,18 @@ export async function runAriaChat(
       `Aria: chat completion with tools failed for model "${model}", retrying without tools:`,
       e
     );
+    try {
+      completion = await client.chat.completions.create({ model, messages });
+    } catch (e2) {
+      console.error(
+        `Aria: retry without tools also failed for model "${model}":`,
+        e2
+      );
+      throw new Error(
+        `The model "${model}" is unavailable or invalid. Pick a different model in Settings.`
+      );
+    }
     toolsEnabled = false;
-    completion = await client.chat.completions.create({ model, messages });
   }
 
   if (!completion.choices?.length) {
