@@ -101,17 +101,65 @@ The CRM exposes a [Model Context Protocol](https://modelcontextprotocol.io) endp
 `/api/mcp`, so Claude can work directly with your data — "add Acme Ltd as a customer",
 "what deals close this month?", "log that I called Jane".
 
+### Prerequisites
+
+- The app must be reachable at a **public HTTPS URL** — Claude connects from its own servers and
+  cannot reach `localhost`. Deploy first (see [Deployment](#deployment)).
+- The URL must **not sit behind a hosting-provider login wall.** On Vercel, *Deployment
+  Protection → Vercel Authentication* covers every `*.vercel.app` URL by default (it exempts only
+  custom domains); Claude would hit that SSO page instead of the app's own authorization. Either
+  add a **custom domain** (exempt from protection) and point Claude at it, or turn Vercel
+  Authentication off for the URL you give Claude.
+- Set **`NEXT_PUBLIC_SITE_URL`** to that deployed origin, and add the same origin to your
+  Supabase project's **Auth → URL Configuration → Redirect URLs**, so the browser sign-in during
+  authorization returns to the app correctly.
+
+Your MCP endpoint is `https://<your-app>/api/mcp` (also shown in **Settings → Connectors & API
+tokens**).
+
+### Connect (recommended: sign-in, no token)
+
+Claude Desktop authorizes through the CRM's built-in OAuth flow — there is no token to paste.
+
+1. In Claude Desktop, open **Settings → Connectors → Add custom connector** and enter the MCP URL
+   `https://<your-app>/api/mcp`.
+2. Click **Connect**. You'll be sent to the CRM in your browser to sign in and approve access.
+3. Back in Claude, ask *"list my companies"* to confirm the connection.
+
+### Alternative: personal access token (scripts, or older Desktop builds)
+
+For automation, other MCP clients, or a Claude Desktop build without remote/OAuth connector
+support, authenticate with a token instead:
+
 1. In the CRM, go to **Settings → Connectors & API tokens** and create a token. Copy it — it's
    shown only once.
-2. In Claude Desktop, open **Settings → Connectors → Add custom connector**, enter
-   `https://<your-app>/api/mcp`, and paste the token as the bearer credential.
-3. Ask Claude to *list my companies* to confirm the connection.
+2. Point an MCP client at the endpoint with the token as a `Bearer` credential. For Claude Desktop,
+   use [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) in your config, e.g.:
+
+   ```jsonc
+   // claude_desktop_config.json
+   {
+     "mcpServers": {
+       "crm": {
+         "command": "npx",
+         "args": [
+           "mcp-remote",
+           "https://<your-app>/api/mcp",
+           "--header",
+           "Authorization: Bearer <your-token>"
+         ]
+       }
+     }
+   }
+   ```
 
 Notes:
 
-- **Everything runs as you.** A token is bound to your workspace membership, and every write goes
-  through the same `requirePermission` checks as the UI — Claude can never exceed your own access.
-- Revoke a token any time from the same screen; the connector loses access immediately.
+- **Everything runs as you.** A connection is bound to your workspace membership, and every write
+  goes through the same `requirePermission` checks as the UI — Claude can never exceed your own
+  access.
+- Revoke a token any time from **Settings → Connectors**; the connector loses access immediately.
+  OAuth connections can likewise be removed from Claude Desktop.
 - Claude's free plan allows one custom connector, which is enough for this.
 - Tools available: search, list/get for companies, contacts, deals, tasks, notes, notebook notes,
   leads, pipelines and team members; `create_record` / `update_record` / `delete_record` across
