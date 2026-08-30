@@ -1,14 +1,18 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { PlugZap } from "lucide-react";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
 import { isAiConfigured } from "@/features/ai/settings-queries";
+import { isApolloConfigured } from "@/features/apollo/settings-queries";
 import { getCampaigns, getLeads } from "@/features/leads/queries";
 import { getMemberOptions } from "@/features/team/queries";
 import { getStages } from "@/features/deals/queries";
 import { CampaignsList } from "@/features/leads/components/campaigns-list";
 import { LeadsTable } from "@/features/leads/components/leads-table";
 import { PageHeader } from "@/components/shared/page-header";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +29,24 @@ export default async function LeadsPage() {
     getStages(ctx.workspace.id),
   ]);
   const aiEnabled = (await isAiConfigured(ctx.workspace.id)) && allowed.has("ai.use");
+  const canImport = allowed.has("leads.import");
+  const apolloEnabled = canImport && (await isApolloConfigured(ctx.workspace.id));
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Leads"
         description="Automated lead discovery from OpenStreetMap, scored by AI"
+        action={
+          canImport ? (
+            <Button variant="outline" asChild>
+              <Link href="/leads/apollo">
+                <PlugZap className="size-4" />
+                Search Apollo
+              </Link>
+            </Button>
+          ) : undefined
+        }
       />
 
       <CampaignsList
@@ -52,6 +68,7 @@ export default async function LeadsPage() {
           canDelete={allowed.has("leads.delete")}
           canCreateDeal={allowed.has("deals.create")}
           aiEnabled={aiEnabled}
+          apolloEnabled={apolloEnabled}
         />
       </div>
     </div>

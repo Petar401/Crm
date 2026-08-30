@@ -302,6 +302,8 @@ export interface Lead {
   created_by: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  enriched_at: string | null;
+  enriched_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -328,6 +330,14 @@ export interface WorkspaceAiSettings {
   key_preview: string;
   provider: AiProvider;
   model: string | null;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export interface WorkspaceApolloSettings {
+  workspace_id: string;
+  encrypted_api_key: string;
+  key_preview: string;
   updated_by: string | null;
   updated_at: string;
 }

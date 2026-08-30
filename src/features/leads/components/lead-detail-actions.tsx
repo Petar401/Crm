@@ -10,6 +10,7 @@ import type { MemberOption } from "@/features/team/queries";
 import { deleteLead } from "@/features/leads/actions";
 import { LeadForm } from "@/features/leads/components/lead-form";
 import { ConvertLeadDialog } from "@/features/leads/components/convert-lead-dialog";
+import { EnrichButton } from "@/features/apollo/components/enrich-button";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
@@ -20,6 +21,7 @@ interface Props {
   canUpdate: boolean;
   canDelete: boolean;
   canCreateDeal: boolean;
+  apolloEnabled: boolean;
 }
 
 export function LeadDetailActions({
@@ -29,6 +31,7 @@ export function LeadDetailActions({
   canUpdate,
   canDelete,
   canCreateDeal,
+  apolloEnabled,
 }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -57,6 +60,9 @@ export function LeadDetailActions({
           <Pencil className="size-4" />
           Edit
         </Button>
+      )}
+      {apolloEnabled && canUpdate && (
+        <EnrichButton leadId={lead.id} variant="full" />
       )}
       {canDelete && (
         <Button

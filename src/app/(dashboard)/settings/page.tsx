@@ -15,6 +15,12 @@ import {
 } from "@/features/ai/settings-queries";
 import { listOpenRouterFreeModels } from "@/features/ai/openrouter-models";
 import { AiKeySettings } from "@/features/ai/components/ai-key-settings";
+import {
+  isApolloConfigured,
+  getWorkspaceApolloSettings,
+  isApolloEncryptionKeyConfigured,
+} from "@/features/apollo/settings-queries";
+import { ApolloKeySettings } from "@/features/apollo/components/apollo-key-settings";
 import { TeamSettings } from "@/features/team/components/team-settings";
 import { InviteMemberDialog } from "@/features/team/components/invite-member-dialog";
 import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
@@ -36,12 +42,15 @@ export default async function SettingsPage() {
   const canManageTokens = allowed.has("settings.tokens");
   const canManageAiKey = allowed.has("settings.update");
 
-  const [tokens, aiConfigured, aiSettings, openRouterModels] = await Promise.all([
-    canManageTokens ? getApiTokens(ctx.member.id) : Promise.resolve([]),
-    isAiConfigured(ctx.workspace.id),
-    canManageAiKey ? getWorkspaceAiSettings(ctx.workspace.id) : Promise.resolve(null),
-    canManageAiKey ? listOpenRouterFreeModels() : Promise.resolve([]),
-  ]);
+  const [tokens, aiConfigured, aiSettings, openRouterModels, apolloConfigured, apolloSettings] =
+    await Promise.all([
+      canManageTokens ? getApiTokens(ctx.member.id) : Promise.resolve([]),
+      isAiConfigured(ctx.workspace.id),
+      canManageAiKey ? getWorkspaceAiSettings(ctx.workspace.id) : Promise.resolve(null),
+      canManageAiKey ? listOpenRouterFreeModels() : Promise.resolve([]),
+      isApolloConfigured(ctx.workspace.id),
+      canManageAiKey ? getWorkspaceApolloSettings(ctx.workspace.id) : Promise.resolve(null),
+    ]);
   const headerList = await headers();
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL ??
@@ -78,6 +87,14 @@ export default async function SettingsPage() {
                 <Badge variant="outline">Not configured</Badge>
               )}
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Apollo.io</span>
+              {apolloConfigured ? (
+                <Badge variant="secondary">Enabled</Badge>
+              ) : (
+                <Badge variant="outline">Not configured</Badge>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -92,6 +109,20 @@ export default async function SettingsPage() {
                 hasEnvFallback={hasEnvFallbackKey()}
                 openRouterModels={openRouterModels}
                 encryptionConfigured={isAiEncryptionKeyConfigured()}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {canManageAiKey && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Apollo.io API key</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ApolloKeySettings
+                settings={apolloSettings}
+                encryptionConfigured={isApolloEncryptionKeyConfigured()}
               />
             </CardContent>
           </Card>

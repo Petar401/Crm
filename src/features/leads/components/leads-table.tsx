@@ -25,6 +25,7 @@ import {
   rejectLead,
 } from "@/features/leads/actions";
 import { draftLeadEmail } from "@/features/ai/actions";
+import { EnrichButton } from "@/features/apollo/components/enrich-button";
 import { scoreTier, SCORE_TIER_LABEL, SCORE_TIER_STYLE } from "@/features/leads/score";
 import { LeadForm } from "@/features/leads/components/lead-form";
 import { ConvertLeadDialog } from "@/features/leads/components/convert-lead-dialog";
@@ -75,6 +76,7 @@ interface LeadsTableProps {
   canDelete: boolean;
   canCreateDeal: boolean;
   aiEnabled: boolean;
+  apolloEnabled: boolean;
 }
 
 type SortKey = "score" | "newest" | "name";
@@ -100,6 +102,7 @@ export function LeadsTable({
   canDelete,
   canCreateDeal,
   aiEnabled,
+  apolloEnabled,
 }: LeadsTableProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -371,6 +374,9 @@ export function LeadsTable({
                         >
                           <Mail className="size-4" />
                         </Button>
+                      )}
+                      {apolloEnabled && canUpdate && (
+                        <EnrichButton leadId={lead.id} />
                       )}
                       {canUpdate && lead.status === "pending" && (
                         <>
