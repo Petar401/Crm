@@ -43,7 +43,8 @@ insert into public.permissions (key, description) values
   ('leads.view',       'View lead campaigns & discovered leads'),
   ('leads.create',     'Create campaigns & run lead discovery'),
   ('leads.update',     'Edit campaigns & review/approve leads'),
-  ('leads.delete',     'Delete campaigns & leads')
+  ('leads.delete',     'Delete campaigns & leads'),
+  ('leads.import',     'Import leads & enrich via Apollo.io (uses paid credits)')
 on conflict (key) do update set description = excluded.description;
 
 -- Default role permissions template: grant a sensible read/write baseline to
