@@ -96,6 +96,10 @@ export interface ApolloPeopleSearchParams {
   page?: number;
 }
 
+/**
+ * Apollo deprecated `/mixed_people/search` for API callers in favor of
+ * `/mixed_people/api_search` — same request/response shape, different path.
+ */
 export async function searchPeople(
   apiKey: string,
   params: ApolloPeopleSearchParams
@@ -103,7 +107,7 @@ export async function searchPeople(
   const data = await apolloRequest<{
     people?: ApolloPerson[];
     pagination?: { total_entries?: number };
-  }>(apiKey, "/mixed_people/search", {
+  }>(apiKey, "/mixed_people/api_search", {
     method: "POST",
     body: {
       person_titles: params.personTitles,
