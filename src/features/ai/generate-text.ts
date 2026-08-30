@@ -17,13 +17,18 @@ export async function generateText(
   const model =
     credentials.model ?? AI_PROVIDERS[credentials.provider].defaultModel;
 
-  const completion = await client.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: systemInstruction },
-      { role: "user", content: prompt },
-    ],
-  });
+  const completion = await client.chat.completions.create(
+    {
+      model,
+      messages: [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: prompt },
+      ],
+    },
+    // Fail fast rather than risk a single stalled request eating a bulk
+    // campaign run's whole execution budget.
+    { signal: AbortSignal.timeout(20_000) }
+  );
 
   if (!completion.choices?.length) {
     throw new Error(

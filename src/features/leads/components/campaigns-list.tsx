@@ -61,18 +61,29 @@ export function CampaignsList({
   function handleRun(campaign: LeadCampaign) {
     setRunningId(campaign.id);
     startTransition(async () => {
-      const result = await runCampaignNow(campaign.id);
-      setRunningId(null);
-      if (result.error) {
-        toast.error(result.error);
-        return;
+      try {
+        const result = await runCampaignNow(campaign.id);
+        setRunningId(null);
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success(
+          result.count
+            ? `Found ${result.count} new lead${result.count === 1 ? "" : "s"}`
+            : "No new leads this run"
+        );
+        router.refresh();
+      } catch {
+        // A genuine transport/timeout failure — leads found before the
+        // failure may already be saved, so send the user to check rather
+        // than letting this fall through to the route error boundary.
+        setRunningId(null);
+        toast.error(
+          "Campaign run failed or timed out. Some leads may have already been saved — check the review queue."
+        );
+        router.refresh();
       }
-      toast.success(
-        result.count
-          ? `Found ${result.count} new lead${result.count === 1 ? "" : "s"}`
-          : "No new leads this run"
-      );
-      router.refresh();
     });
   }
 

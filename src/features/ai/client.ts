@@ -15,11 +15,14 @@ import { AI_PROVIDERS, type AiProvider } from "@/features/ai/providers";
 export interface AiChatClient {
   chat: {
     completions: {
-      create(params: {
-        model: string;
-        messages: OpenAI.Chat.ChatCompletionMessageParam[];
-        tools?: OpenAI.Chat.ChatCompletionTool[];
-      }): Promise<OpenAI.Chat.ChatCompletion>;
+      create(
+        params: {
+          model: string;
+          messages: OpenAI.Chat.ChatCompletionMessageParam[];
+          tools?: OpenAI.Chat.ChatCompletionTool[];
+        },
+        options?: { signal?: AbortSignal }
+      ): Promise<OpenAI.Chat.ChatCompletion>;
     };
   };
 }

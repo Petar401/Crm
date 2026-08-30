@@ -48,6 +48,9 @@ async function apolloRequest<T>(
       "x-api-key": apiKey,
     },
     body: init.body ? JSON.stringify(init.body) : undefined,
+    // Fail fast rather than risk a single stalled request eating a bulk
+    // campaign run's whole execution budget.
+    signal: AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {
