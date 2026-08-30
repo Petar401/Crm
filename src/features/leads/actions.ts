@@ -29,12 +29,16 @@ function toCampaignRow(input: ReturnType<typeof campaignSchema.parse>) {
   const minScore = input.min_score ? parseInt(input.min_score, 10) : 0;
   return {
     name: input.name,
+    source: input.source,
     business_description: input.business_description,
     target_categories: categories,
     location: input.location,
     country: input.country || null,
     frequency: input.frequency,
-    auto_create: input.auto_create,
+    // Apollo campaigns always land in the pending review queue — never
+    // trust the client's auto_create value for them (the UI hides the
+    // toggle, but a direct action call shouldn't be able to bypass this).
+    auto_create: input.source === "apollo" ? false : input.auto_create,
     max_results: clamp(max, 1, 100),
     run_hour: clamp(runHour, 0, 23),
     min_score: clamp(minScore, 0, 100),
@@ -49,6 +53,7 @@ export async function createCampaign(values: unknown): Promise<ActionResult> {
 
   const ctx = await requireAuthContext();
   await requirePermission("leads.create");
+  if (parsed.data.source === "apollo") await requirePermission("leads.import");
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -78,6 +83,7 @@ export async function updateCampaign(
 
   const ctx = await requireAuthContext();
   await requirePermission("leads.update");
+  if (parsed.data.source === "apollo") await requirePermission("leads.import");
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -126,6 +132,7 @@ export async function runCampaignNow(id: string): Promise<RunActionResult> {
     .eq("workspace_id", ctx.workspace.id)
     .maybeSingle<LeadCampaign>();
   if (!campaign) return { error: "Campaign not found." };
+  if (campaign.source === "apollo") await requirePermission("leads.import");
 
   const result = await runCampaign(supabase, campaign, ctx.userId);
   if (result.error) return { error: result.error };

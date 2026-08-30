@@ -7,6 +7,8 @@ import { resolveAiCredentials } from "@/features/ai/settings-queries";
 import type { LeadCampaign } from "@/lib/db/types";
 import { safeFetchText } from "@/lib/utils/safe-fetch";
 import { searchBusinesses, type OverpassBusiness } from "./overpass";
+import { normalizeHost, markCampaignRun } from "./campaign-run-utils";
+import { runApolloCampaign } from "@/features/apollo/campaign-run";
 
 export interface RunResult {
   count: number;
@@ -20,17 +22,6 @@ interface Enrichment {
   contactName: string | null;
   contactEmail: string | null;
   jobTitle: string | null;
-}
-
-/** Normalise a website to a bare hostname for dedupe comparisons. */
-function normalizeHost(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    const withProto = url.startsWith("http") ? url : `https://${url}`;
-    return new URL(withProto).hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return url.replace(/^www\./, "").toLowerCase();
-  }
 }
 
 /**
@@ -166,12 +157,29 @@ function finalScore(aiScore: number | null, baseScore: number): number {
 }
 
 /**
- * Run a single campaign: discover businesses, dedupe, AI-score/enrich, then
- * either queue leads for review or auto-create Company (+ Contact) records.
- * Accepts the Supabase client so it works from both an RLS-aware server action
- * and the service-role cron route.
+ * Run a single campaign. Dispatches on `campaign.source`: OpenStreetMap
+ * (free, the original implementation below) or Apollo.io (paid, bulk B2B
+ * search + enrichment — see src/features/apollo/campaign-run.ts). Accepts the
+ * Supabase client so it works from both an RLS-aware server action and the
+ * service-role cron route.
  */
 export async function runCampaign(
+  supabase: SupabaseClient,
+  campaign: LeadCampaign,
+  actorUserId: string | null
+): Promise<RunResult> {
+  if (campaign.source === "apollo") {
+    return runApolloCampaign(supabase, campaign, actorUserId);
+  }
+  return runOsmCampaign(supabase, campaign, actorUserId);
+}
+
+/**
+ * Run a single OpenStreetMap campaign: discover businesses, dedupe, AI-score/
+ * enrich, then either queue leads for review or auto-create Company
+ * (+ Contact) records.
+ */
+async function runOsmCampaign(
   supabase: SupabaseClient,
   campaign: LeadCampaign,
   actorUserId: string | null
@@ -186,7 +194,7 @@ export async function runCampaign(
     });
   } catch (e) {
     const error = e instanceof Error ? e.message : "Lead source failed.";
-    await markRun(supabase, campaign.id, "error", 0);
+    await markCampaignRun(supabase, campaign.id, "error", 0);
     return { count: 0, scanned: 0, error };
   }
 
@@ -290,7 +298,7 @@ export async function runCampaign(
     }
   }
 
-  await markRun(supabase, campaign.id, "ok", count);
+  await markCampaignRun(supabase, campaign.id, "ok", count);
   return { count, scanned: businesses.length };
 }
 
@@ -349,20 +357,4 @@ async function createCompanyAndContact(
   }
 
   return { companyId: company.id, contactId };
-}
-
-async function markRun(
-  supabase: SupabaseClient,
-  campaignId: string,
-  status: string,
-  count: number
-): Promise<void> {
-  await supabase
-    .from("lead_campaigns")
-    .update({
-      last_run_at: new Date().toISOString(),
-      last_run_status: status,
-      last_run_count: count,
-    })
-    .eq("id", campaignId);
 }

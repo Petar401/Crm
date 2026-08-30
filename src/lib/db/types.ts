@@ -250,12 +250,14 @@ export interface Invoice {
 }
 
 export type CampaignFrequency = "manual" | "daily" | "weekly";
+export type CampaignSource = "openstreetmap" | "apollo";
 export type LeadStatus = "pending" | "approved" | "rejected" | "converted";
 
 export interface LeadCampaign {
   id: string;
   workspace_id: string;
   name: string;
+  source: CampaignSource;
   business_description: string;
   target_categories: string[];
   location: string | null;
