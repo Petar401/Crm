@@ -54,6 +54,7 @@ export default async function LeadsPage() {
         canCreate={allowed.has("leads.create")}
         canUpdate={allowed.has("leads.update")}
         canDelete={allowed.has("leads.delete")}
+        apolloEnabled={apolloEnabled}
       />
 
       <div className="space-y-4">

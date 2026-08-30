@@ -42,12 +42,14 @@ interface CampaignFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   campaign?: LeadCampaign;
+  apolloEnabled: boolean;
 }
 
 export function CampaignForm({
   open,
   onOpenChange,
   campaign,
+  apolloEnabled,
 }: CampaignFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -57,6 +59,7 @@ export function CampaignForm({
     resolver: zodResolver(campaignSchema),
     defaultValues: {
       name: campaign?.name ?? "",
+      source: campaign?.source ?? "openstreetmap",
       business_description: campaign?.business_description ?? "",
       target_categories: campaign?.target_categories?.join(", ") ?? "",
       location: campaign?.location ?? "",
@@ -70,6 +73,8 @@ export function CampaignForm({
   });
 
   const frequency = form.watch("frequency");
+  const source = form.watch("source");
+  const isApollo = source === "apollo";
 
   function onSubmit(values: CampaignInput) {
     startTransition(async () => {
@@ -94,7 +99,7 @@ export function CampaignForm({
           <SheetTitle>{isEdit ? "Edit campaign" : "New lead campaign"}</SheetTitle>
           <SheetDescription>
             Describe who you want to reach. The automation finds matching
-            businesses from OpenStreetMap and scores them against your business.
+            leads from your chosen source and scores them against your business.
           </SheetDescription>
         </SheetHeader>
         <Form {...form}>
@@ -111,6 +116,37 @@ export function CampaignForm({
                   <FormControl>
                     <Input placeholder="Dentists in Berlin" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="source"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Lead source</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="openstreetmap">
+                        OpenStreetMap (free)
+                      </SelectItem>
+                      <SelectItem value="apollo" disabled={!apolloEnabled}>
+                        Apollo.io{!apolloEnabled ? " — connect in Settings" : ""}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {isApollo && (
+                    <FormDescription>
+                      Each result uses 2 Apollo credits (search + email
+                      lookup) and always goes to the review queue first.
+                    </FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -140,12 +176,21 @@ export function CampaignForm({
               name="target_categories"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Target categories</FormLabel>
+                  <FormLabel>{isApollo ? "Job titles" : "Target categories"}</FormLabel>
                   <FormControl>
-                    <Input placeholder="dentist, clinic, doctor" {...field} />
+                    <Input
+                      placeholder={
+                        isApollo
+                          ? "CEO, Owner, Managing Director"
+                          : "dentist, clinic, doctor"
+                      }
+                      {...field}
+                    />
                   </FormControl>
                   <FormDescription>
-                    Comma-separated business types to search for.
+                    {isApollo
+                      ? "Comma-separated job titles to search for."
+                      : "Comma-separated business types to search for."}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -262,27 +307,34 @@ export function CampaignForm({
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="auto_create"
-              render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5 pr-4">
-                    <FormLabel>Auto-create companies</FormLabel>
-                    <FormDescription>
-                      On: create Company + Contact records directly. Off: queue
-                      leads for review first.
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            {isApollo ? (
+              <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-sm">
+                Apollo leads always go to the review queue first — there&apos;s
+                no auto-create option for this source.
+              </p>
+            ) : (
+              <FormField
+                control={form.control}
+                name="auto_create"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5 pr-4">
+                      <FormLabel>Auto-create companies</FormLabel>
+                      <FormDescription>
+                        On: create Company + Contact records directly. Off: queue
+                        leads for review first.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
             <SheetFooter className="px-0">
               <Button type="submit" disabled={pending}>
                 {pending

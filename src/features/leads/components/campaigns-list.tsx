@@ -41,6 +41,7 @@ interface CampaignsListProps {
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
+  apolloEnabled: boolean;
 }
 
 export function CampaignsList({
@@ -48,6 +49,7 @@ export function CampaignsList({
   canCreate,
   canUpdate,
   canDelete,
+  apolloEnabled,
 }: CampaignsListProps) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
@@ -155,6 +157,9 @@ export function CampaignsList({
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {campaign.source === "apollo" && (
+                    <Badge variant="secondary">Apollo.io</Badge>
+                  )}
                   <Badge variant="secondary" className="capitalize">
                     {campaign.frequency}
                     {campaign.frequency !== "manual" &&
@@ -192,13 +197,18 @@ export function CampaignsList({
       )}
 
       {canCreate && (
-        <CampaignForm open={createOpen} onOpenChange={setCreateOpen} />
+        <CampaignForm
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          apolloEnabled={apolloEnabled}
+        />
       )}
       {editing && (
         <CampaignForm
           open={!!editing}
           onOpenChange={(o) => !o && setEditing(null)}
           campaign={editing}
+          apolloEnabled={apolloEnabled}
         />
       )}
       <ConfirmDialog
