@@ -5,9 +5,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateText } from "@/features/ai/generate-text";
 import { resolveAiCredentials } from "@/features/ai/settings-queries";
 import { resolveApolloApiKey } from "@/features/apollo/settings-queries";
+import { scoreApolloPerson } from "@/features/apollo/score";
 import {
   searchPeople,
   enrichPerson,
+  enrichOrganization,
   ApolloApiError,
   type ApolloPerson,
 } from "@/features/apollo/client";
@@ -20,22 +22,25 @@ import type { LeadCampaign } from "@/lib/db/types";
 export interface RunResult {
   count: number;
   scanned: number;
+  skipped?: number;
   error?: string;
 }
 
 /**
- * AI-scores an Apollo result against the campaign's business description.
- * Unlike the OSM scorer, there's no website to scrape — Apollo already
- * returns real title/company/industry — so the base score starts higher
- * (Apollo leads are inherently "complete": a real, contactable person).
+ * AI-scores an Apollo result against the campaign's business description,
+ * layered on top of the same completeness heuristic used by the ad-hoc
+ * search/import path (scoreApolloPerson) so both paths produce comparable
+ * scores rather than diverging baselines.
  */
 async function scoreApolloLead(
   person: ApolloPerson,
   campaign: LeadCampaign
 ): Promise<{ score: number; reason: string | null }> {
-  const BASE_SCORE = 60;
+  const { score: baseScore, reason: baseReason } = scoreApolloPerson(person, {
+    locations: campaign.location ? [campaign.location] : undefined,
+  });
   const credentials = await resolveAiCredentials(campaign.workspace_id);
-  if (!credentials) return { score: BASE_SCORE, reason: null };
+  if (!credentials) return { score: baseScore, reason: baseReason };
 
   const prompt = [
     `Our business: ${campaign.business_description}`,
@@ -62,15 +67,15 @@ async function scoreApolloLead(
       credentials
     );
     const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return { score: BASE_SCORE, reason: null };
+    if (!match) return { score: baseScore, reason: baseReason };
     const parsed = JSON.parse(match[0]) as Record<string, unknown>;
     const aiScore = Number(parsed.score);
-    const reason = typeof parsed.reason === "string" ? parsed.reason : null;
-    if (!Number.isFinite(aiScore)) return { score: BASE_SCORE, reason };
+    const reason = typeof parsed.reason === "string" ? parsed.reason : baseReason;
+    if (!Number.isFinite(aiScore)) return { score: baseScore, reason };
     const clamped = Math.max(0, Math.min(100, aiScore));
-    return { score: Math.round(clamped * 0.7 + BASE_SCORE * 0.3), reason };
+    return { score: Math.round(clamped * 0.7 + baseScore * 0.3), reason };
   } catch {
-    return { score: BASE_SCORE, reason: null };
+    return { score: baseScore, reason: baseReason };
   }
 }
 
@@ -165,9 +170,12 @@ export async function runApolloCampaign(
   // batches instead — inserts stay sequential per batch so a failure partway
   // through still stops the run at a well-defined point.
   const BATCH_SIZE = 5;
+  const CONSECUTIVE_FAILURE_LIMIT = 3;
   let count = 0;
+  let skipped = 0;
   let stoppedEarly = false;
   let unauthorizedError: string | null = null;
+  let consecutiveFailures = 0;
 
   batches: for (let i = 0; i < fresh.length; i += BATCH_SIZE) {
     const batch = fresh.slice(i, i + BATCH_SIZE);
@@ -199,26 +207,52 @@ export async function runApolloCampaign(
       })
     );
 
-    let batchFailed = false;
     for (const result of batchResults) {
       if (result.error) {
         if (result.error instanceof ApolloApiError && result.error.kind === "unauthorized") {
           unauthorizedError = "Apollo rejected the API key.";
+          break;
         }
-        // Out of credits or any other enrichment failure: stop importing
-        // further leads this run, keep whatever already succeeded.
-        batchFailed = true;
+        // A single failed lead shouldn't truncate the rest of the run — skip
+        // it and keep going. Only sustained failures (credits exhausted,
+        // persistent rate limiting) stop the run early.
+        skipped += 1;
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
+          stoppedEarly = true;
+        }
         continue;
       }
 
+      consecutiveFailures = 0;
       const { person, enriched, contact, score, reason } = result;
       if (score! < (campaign.min_score ?? 0)) continue;
+
+      let addressLine1: string | null = null;
+      let state: string | null = null;
+      let postalCode: string | null = null;
+      const domain = normalizeHost(contact!.organization?.website_url ?? null);
+      if (domain) {
+        try {
+          const org = await enrichOrganization(apiKey, domain);
+          if (org) {
+            addressLine1 = org.street_address ?? org.raw_address ?? null;
+            state = org.state ?? null;
+            postalCode = org.postal_code ?? null;
+          }
+        } catch {
+          // Address enrichment is best-effort — don't block the insert.
+        }
+      }
 
       const { error } = await supabase.from("leads").insert({
         workspace_id: campaign.workspace_id,
         campaign_id: campaign.id,
         company_name: contact!.organization?.name ?? contact!.name ?? "Unknown",
         website: contact!.organization?.website_url ?? null,
+        address_line_1: addressLine1,
+        state,
+        postal_code: postalCode,
         industry: contact!.organization?.industry ?? null,
         city: contact!.organization?.city ?? contact!.city,
         country: contact!.organization?.country ?? contact!.country,
@@ -240,20 +274,20 @@ export async function runApolloCampaign(
 
     if (unauthorizedError) {
       await markCampaignRun(supabase, campaign.id, "error", count);
-      return { count, scanned: people.length, error: unauthorizedError };
+      return { count, scanned: people.length, skipped, error: unauthorizedError };
     }
-    if (batchFailed) {
-      stoppedEarly = true;
-      break batches;
-    }
+    if (stoppedEarly) break batches;
   }
 
   await markCampaignRun(supabase, campaign.id, stoppedEarly ? "partial" : "ok", count);
   return {
     count,
     scanned: people.length,
+    skipped,
     error: stoppedEarly
-      ? "Stopped early — Apollo credit or plan limit reached."
-      : undefined,
+      ? "Stopped early — repeated Apollo credit or rate-limit failures."
+      : skipped > 0
+        ? `${skipped} lead${skipped === 1 ? "" : "s"} skipped due to transient Apollo errors.`
+        : undefined,
   };
 }

@@ -285,6 +285,8 @@ export interface Lead {
   phone: string | null;
   email: string | null;
   address_line_1: string | null;
+  state: string | null;
+  postal_code: string | null;
   city: string | null;
   country: string | null;
   industry: string | null;

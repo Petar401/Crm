@@ -69,6 +69,9 @@ export async function enrichLead(leadId: string): Promise<EnrichResult> {
       if (e.kind === "credits") {
         return { error: "Apollo enrichment failed — you may be out of credits or plan limit." };
       }
+      if (e.kind === "rate_limited") {
+        return { error: "Apollo is rate-limiting requests — try again in a moment." };
+      }
     }
     return { error: e instanceof Error ? e.message : "Apollo enrichment failed." };
   }

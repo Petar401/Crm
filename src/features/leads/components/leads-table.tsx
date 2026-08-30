@@ -26,6 +26,8 @@ import {
 } from "@/features/leads/actions";
 import { draftLeadEmail } from "@/features/ai/actions";
 import { EnrichButton } from "@/features/apollo/components/enrich-button";
+import { getApolloEmailStatus } from "@/features/apollo/lead-raw";
+import { EmailStatusBadge } from "@/components/shared/email-status-badge";
 import { scoreTier, SCORE_TIER_LABEL, SCORE_TIER_STYLE } from "@/features/leads/score";
 import { LeadForm } from "@/features/leads/components/lead-form";
 import { ConvertLeadDialog } from "@/features/leads/components/convert-lead-dialog";
@@ -350,7 +352,12 @@ export function LeadsTable({
                       <div>
                         <div>{lead.contact_name}</div>
                         {lead.contact_email && (
-                          <div className="text-xs">{lead.contact_email}</div>
+                          <div className="flex items-center gap-1.5 text-xs">
+                            {lead.contact_email}
+                            {lead.source === "apollo" && (
+                              <EmailStatusBadge status={getApolloEmailStatus(lead.raw)} />
+                            )}
+                          </div>
                         )}
                       </div>
                     ) : (

@@ -129,7 +129,9 @@ export default async function LeadDetailPage({
               <Row
                 label="Location"
                 value={
-                  [lead.city, lead.country].filter(Boolean).join(", ") || "—"
+                  [lead.address_line_1, lead.city, lead.state, lead.postal_code, lead.country]
+                    .filter(Boolean)
+                    .join(", ") || "—"
                 }
               />
               {lead.website && (

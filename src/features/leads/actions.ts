@@ -150,6 +150,8 @@ function toLeadRow(input: ReturnType<typeof leadSchema.parse>) {
     email: empty(input.email),
     phone: empty(input.phone),
     address_line_1: empty(input.address_line_1),
+    state: empty(input.state),
+    postal_code: empty(input.postal_code),
     city: empty(input.city),
     country: empty(input.country),
     industry: empty(input.industry),
