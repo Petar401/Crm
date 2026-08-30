@@ -11,6 +11,7 @@ import {
   isAiConfigured,
   getWorkspaceAiSettings,
   hasEnvFallbackKey,
+  isAiEncryptionKeyConfigured,
 } from "@/features/ai/settings-queries";
 import { listOpenRouterFreeModels } from "@/features/ai/openrouter-models";
 import { AiKeySettings } from "@/features/ai/components/ai-key-settings";
@@ -90,6 +91,7 @@ export default async function SettingsPage() {
                 settings={aiSettings}
                 hasEnvFallback={hasEnvFallbackKey()}
                 openRouterModels={openRouterModels}
+                encryptionConfigured={isAiEncryptionKeyConfigured()}
               />
             </CardContent>
           </Card>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound } from "lucide-react";
+import { KeyRound, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { saveAiApiKey, clearAiApiKey } from "@/features/ai/settings-actions";
@@ -35,12 +35,14 @@ interface Props {
   settings: AiSettingsSummary | null;
   hasEnvFallback: boolean;
   openRouterModels: OpenRouterModelOption[];
+  encryptionConfigured: boolean;
 }
 
 export function AiKeySettings({
   settings,
   hasEnvFallback,
   openRouterModels,
+  encryptionConfigured,
 }: Props) {
   const router = useRouter();
   const [provider, setProvider] = useState<AiProvider>(
@@ -80,6 +82,17 @@ export function AiKeySettings({
 
   return (
     <div className="space-y-4">
+      {!encryptionConfigured && (
+        <div className="border-destructive/50 bg-destructive/10 text-destructive flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          <span>
+            AI encryption key not configured on the server — the chatbot
+            can&apos;t be enabled until an administrator sets{" "}
+            <code className="font-mono text-xs">AI_KEY_ENCRYPTION_SECRET</code>{" "}
+            in the deployment environment.
+          </span>
+        </div>
+      )}
       <div className="text-muted-foreground text-sm">
         Set your own AI API key for this workspace — get one free at{" "}
         <a

@@ -21,7 +21,16 @@ export async function saveAiApiKey(values: unknown): Promise<ActionResult> {
   const ctx = await requireAuthContext();
   await requirePermission("settings.update");
 
-  const encrypted_api_key = encryptSecret(parsed.data.apiKey);
+  let encrypted_api_key: string;
+  try {
+    encrypted_api_key = encryptSecret(parsed.data.apiKey);
+  } catch (e) {
+    console.error("Failed to encrypt AI API key:", e);
+    return {
+      error:
+        "Could not save the API key — AI encryption isn't configured on this server. Ask your administrator to set AI_KEY_ENCRYPTION_SECRET.",
+    };
+  }
   const key_preview = parsed.data.apiKey.slice(-4);
 
   const supabase = await createClient();

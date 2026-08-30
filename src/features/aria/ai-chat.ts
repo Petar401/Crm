@@ -112,17 +112,43 @@ export async function runAriaChat(
 
   const client = createAiClient(credentials.provider, credentials.apiKey);
 
-  let completion = await client.chat.completions.create({
-    model,
-    messages,
-    tools: TOOLS,
-  });
+  // Some models (especially free OpenRouter ones) reject or mishandle
+  // function-calling requests. Try with tools first, and if that fails
+  // outright (or comes back with no choices), retry once without tools so
+  // the chat still works — just without on-demand file reading.
+  let toolsEnabled = true;
+  let completion;
+  try {
+    completion = await client.chat.completions.create({
+      model,
+      messages,
+      tools: TOOLS,
+    });
+    if (!completion.choices?.length) {
+      throw new Error("Empty choices in completion response");
+    }
+  } catch (e) {
+    console.error(
+      `Aria: chat completion with tools failed for model "${model}", retrying without tools:`,
+      e
+    );
+    toolsEnabled = false;
+    completion = await client.chat.completions.create({ model, messages });
+  }
+
+  if (!completion.choices?.length) {
+    throw new Error(
+      "The selected model returned no response — it may not be available right now. Try a different model in Settings."
+    );
+  }
+
   let choice = completion.choices[0].message;
 
   // Agentic loop: keep resolving read_workspace_file calls until the model
-  // produces a normal answer (or we hit the safety bound).
+  // produces a normal answer (or we hit the safety bound). Skipped entirely
+  // when tools were disabled above, since the model was never offered any.
   let round = 0;
-  while (choice.tool_calls?.length && round < MAX_TOOL_ROUNDS) {
+  while (toolsEnabled && choice.tool_calls?.length && round < MAX_TOOL_ROUNDS) {
     round++;
     messages.push({
       role: "assistant",
@@ -158,6 +184,11 @@ export async function runAriaChat(
       messages,
       tools: TOOLS,
     });
+    if (!completion.choices?.length) {
+      throw new Error(
+        "The selected model returned no response — it may not be available right now. Try a different model in Settings."
+      );
+    }
     choice = completion.choices[0].message;
   }
 

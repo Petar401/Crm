@@ -45,6 +45,11 @@ export async function getWorkspaceAiSettings(
  * var fallback (Groq, default model). Uses the service-role client so it
  * also works from the cron route, which has no user session to read the
  * RLS-scoped row through.
+ *
+ * Decryption can throw (e.g. AI_KEY_ENCRYPTION_SECRET missing/rotated on the
+ * deployment) — this is called directly from several Server Component page
+ * renders, so a throw here would crash the whole page. Treat a broken stored
+ * key the same as "not configured" rather than letting it propagate.
  */
 export async function resolveAiCredentials(
   workspaceId: string
@@ -58,11 +63,19 @@ export async function resolveAiCredentials(
       Pick<WorkspaceAiSettings, "provider" | "encrypted_api_key" | "model">
     >();
   if (data?.encrypted_api_key) {
-    return {
-      provider: data.provider,
-      apiKey: decryptSecret(data.encrypted_api_key),
-      model: data.model,
-    };
+    try {
+      return {
+        provider: data.provider,
+        apiKey: decryptSecret(data.encrypted_api_key),
+        model: data.model,
+      };
+    } catch (e) {
+      console.error(
+        `Failed to decrypt AI API key for workspace ${workspaceId}:`,
+        e
+      );
+      return null;
+    }
   }
   const envKey = process.env.GROQ_API_KEY;
   if (!envKey) return null;
@@ -77,4 +90,15 @@ export async function isAiConfigured(workspaceId: string): Promise<boolean> {
 /** Whether the deployment has a global fallback key configured. */
 export function hasEnvFallbackKey(): boolean {
   return !!process.env.GROQ_API_KEY;
+}
+
+/**
+ * Whether AI_KEY_ENCRYPTION_SECRET is present and well-formed on this
+ * deployment. Checks shape only — never touches stored secret material.
+ * Used to tell Settings apart "nobody has configured AI yet" from "the
+ * server itself is misconfigured and needs an administrator."
+ */
+export function isAiEncryptionKeyConfigured(): boolean {
+  const secret = process.env.AI_KEY_ENCRYPTION_SECRET;
+  return !!secret && /^[0-9a-f]{64}$/i.test(secret);
 }

@@ -25,5 +25,11 @@ export async function generateText(
     ],
   });
 
+  if (!completion.choices?.length) {
+    throw new Error(
+      "The selected model returned no response — it may not be available right now. Try a different model in Settings."
+    );
+  }
+
   return completion.choices[0].message.content?.trim() ?? "";
 }
