@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "4mb",
     },
   },
+  // Node-only email libraries (SMTP send + IMAP read). Kept out of the bundler
+  // so their native/dynamic requires resolve at runtime on the Node server and
+  // never leak into a client chunk. Only imported from `"use server"` actions
+  // and route handlers.
+  serverExternalPackages: ["nodemailer", "imapflow", "mailparser"],
   // The App Router does not register routes inside a dot-prefixed `.well-known`
   // directory, so the OAuth metadata handlers live under `well-known/` and are
   // reached at their canonical dotted paths via this rewrite.

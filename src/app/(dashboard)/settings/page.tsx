@@ -21,6 +21,12 @@ import {
   isApolloEncryptionKeyConfigured,
 } from "@/features/apollo/settings-queries";
 import { ApolloKeySettings } from "@/features/apollo/components/apollo-key-settings";
+import {
+  isEmailConfigured,
+  getWorkspaceEmailSettings,
+  isEmailEncryptionKeyConfigured,
+} from "@/features/email/settings-queries";
+import { EmailConnectionSettings } from "@/features/email/components/email-connection-settings";
 import { TeamSettings } from "@/features/team/components/team-settings";
 import { InviteMemberDialog } from "@/features/team/components/invite-member-dialog";
 import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
@@ -42,15 +48,25 @@ export default async function SettingsPage() {
   const canManageTokens = allowed.has("settings.tokens");
   const canManageAiKey = allowed.has("settings.update");
 
-  const [tokens, aiConfigured, aiSettings, openRouterModels, apolloConfigured, apolloSettings] =
-    await Promise.all([
-      canManageTokens ? getApiTokens(ctx.member.id) : Promise.resolve([]),
-      isAiConfigured(ctx.workspace.id),
-      canManageAiKey ? getWorkspaceAiSettings(ctx.workspace.id) : Promise.resolve(null),
-      canManageAiKey ? listOpenRouterFreeModels() : Promise.resolve([]),
-      isApolloConfigured(ctx.workspace.id),
-      canManageAiKey ? getWorkspaceApolloSettings(ctx.workspace.id) : Promise.resolve(null),
-    ]);
+  const [
+    tokens,
+    aiConfigured,
+    aiSettings,
+    openRouterModels,
+    apolloConfigured,
+    apolloSettings,
+    emailConfigured,
+    emailSettings,
+  ] = await Promise.all([
+    canManageTokens ? getApiTokens(ctx.member.id) : Promise.resolve([]),
+    isAiConfigured(ctx.workspace.id),
+    canManageAiKey ? getWorkspaceAiSettings(ctx.workspace.id) : Promise.resolve(null),
+    canManageAiKey ? listOpenRouterFreeModels() : Promise.resolve([]),
+    isApolloConfigured(ctx.workspace.id),
+    canManageAiKey ? getWorkspaceApolloSettings(ctx.workspace.id) : Promise.resolve(null),
+    isEmailConfigured(ctx.workspace.id),
+    canManageAiKey ? getWorkspaceEmailSettings(ctx.workspace.id) : Promise.resolve(null),
+  ]);
   const headerList = await headers();
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL ??
@@ -95,6 +111,14 @@ export default async function SettingsPage() {
                 <Badge variant="outline">Not configured</Badge>
               )}
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Business email</span>
+              {emailConfigured ? (
+                <Badge variant="secondary">Connected</Badge>
+              ) : (
+                <Badge variant="outline">Not connected</Badge>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -123,6 +147,20 @@ export default async function SettingsPage() {
               <ApolloKeySettings
                 settings={apolloSettings}
                 encryptionConfigured={isApolloEncryptionKeyConfigured()}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {canManageAiKey && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Email account</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <EmailConnectionSettings
+                settings={emailSettings}
+                encryptionConfigured={isEmailEncryptionKeyConfigured()}
               />
             </CardContent>
           </Card>
