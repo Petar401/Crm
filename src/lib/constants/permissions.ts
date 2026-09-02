@@ -47,6 +47,8 @@ export const PERMISSION_KEYS = [
   "leads.update",
   "leads.delete",
   "leads.import",
+  "email.view",
+  "email.send",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -167,6 +169,13 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
         key: "leads.import",
         description: "Import leads & enrich via Apollo.io (uses paid credits)",
       },
+    ],
+  },
+  {
+    label: "Email",
+    permissions: [
+      { key: "email.view", description: "View the mailbox & sent email" },
+      { key: "email.send", description: "Compose & send email" },
     ],
   },
 ];

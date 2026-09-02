@@ -44,7 +44,9 @@ insert into public.permissions (key, description) values
   ('leads.create',     'Create campaigns & run lead discovery'),
   ('leads.update',     'Edit campaigns & review/approve leads'),
   ('leads.delete',     'Delete campaigns & leads'),
-  ('leads.import',     'Import leads & enrich via Apollo.io (uses paid credits)')
+  ('leads.import',     'Import leads & enrich via Apollo.io (uses paid credits)'),
+  ('email.view',       'View the mailbox & sent email'),
+  ('email.send',       'Compose & send email')
 on conflict (key) do update set description = excluded.description;
 
 -- Default role permissions template: grant a sensible read/write baseline to
@@ -66,6 +68,7 @@ where r.is_default
     'files.view','files.upload',
     'invoices.view','invoices.upload',
     'team.view','settings.view','ai.use',
-    'leads.view','leads.create','leads.update'
+    'leads.view','leads.create','leads.update',
+    'email.view','email.send'
   )
 on conflict (role_id, permission_key) do nothing;

@@ -10,6 +10,7 @@ import {
   Settings,
   Sparkles,
   Target,
+  Mail,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +43,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Leads",
     icon: Target,
     permission: "leads.view",
+  },
+  {
+    href: "/email",
+    label: "Email",
+    icon: Mail,
+    permission: "email.view",
   },
   {
     href: "/tasks",

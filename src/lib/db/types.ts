@@ -345,3 +345,58 @@ export interface WorkspaceApolloSettings {
   updated_by: string | null;
   updated_at: string;
 }
+
+export type EmailAuthType = "basic" | "oauth";
+
+/**
+ * Per-workspace shared mailbox connection (see 0025_email.sql). The mailbox
+ * password lives in `encrypted_password` (AES-GCM via lib/security/secret-box);
+ * never select it into anything that reaches the client. `oauth_provider` /
+ * `encrypted_oauth_tokens` are reserved for the phase-2 OAuth flow.
+ */
+export interface WorkspaceEmailSettings {
+  workspace_id: string;
+  from_name: string | null;
+  from_email: string;
+  auth_type: EmailAuthType;
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_secure: boolean;
+  imap_host: string | null;
+  imap_port: number | null;
+  imap_secure: boolean;
+  encrypted_password: string | null;
+  oauth_provider: string | null;
+  encrypted_oauth_tokens: string | null;
+  email_preview: string;
+  last_verified_at: string | null;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export type EmailDirection = "outbound" | "inbound";
+export type EmailStatus = "sent" | "failed";
+
+/** A message sent from the CRM (durable send log — see 0025_email.sql). */
+export interface Email {
+  id: string;
+  workspace_id: string;
+  direction: EmailDirection;
+  message_id: string | null;
+  in_reply_to: string | null;
+  subject: string | null;
+  from_email: string | null;
+  to_emails: string[];
+  cc_emails: string[];
+  bcc_emails: string[];
+  body_text: string | null;
+  body_html: string | null;
+  status: EmailStatus;
+  error: string | null;
+  company_id: string | null;
+  contact_id: string | null;
+  deal_id: string | null;
+  created_by: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
