@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 
 import { requireAuthContext } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import {
   ENTITY_NAMES,
@@ -32,6 +33,10 @@ import {
 import { logActivity } from "@/features/activities/log";
 import { leadStatuses } from "@/features/leads/schemas";
 import type { ActivityType } from "@/lib/db/types";
+import { sendEmail } from "@/features/email/actions";
+import { resolveEmailCredentials } from "@/features/email/settings-queries";
+import { fetchInbox } from "@/features/email/transport";
+import { getSentEmails } from "@/features/email/queries";
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -424,6 +429,76 @@ export function registerCrmTools(server: McpServer): void {
         });
         return ok({ logged: true });
       })
+  );
+
+  // ---------------------------------------------------------------- email
+
+  server.registerTool(
+    "send_email",
+    {
+      title: "Send an email",
+      description:
+        "Send an email from the workspace's connected mailbox, optionally linked to a contact, company, or deal.",
+      inputSchema: z.object({
+        to: z.string().describe("Comma or semicolon separated recipient addresses"),
+        cc: z.string().optional(),
+        bcc: z.string().optional(),
+        subject: z.string(),
+        body: z.string(),
+        contact_id: z.string().uuid().optional(),
+        company_id: z.string().uuid().optional(),
+        deal_id: z.string().uuid().optional(),
+      }),
+    },
+    async ({ to, cc, bcc, subject, body, contact_id, company_id, deal_id }) =>
+      guard(async () => {
+        const result = await sendEmail({
+          to,
+          cc,
+          bcc,
+          subject,
+          body,
+          contactId: contact_id,
+          companyId: company_id,
+          dealId: deal_id,
+        });
+        return result.error ? fail(result.error) : ok({ id: result.id });
+      })
+  );
+
+  server.registerTool(
+    "list_inbox_messages",
+    {
+      title: "List inbox messages",
+      description:
+        "List the most recent messages in the workspace's connected inbox.",
+      inputSchema: z.object({
+        limit: z.number().int().min(1).max(100).optional(),
+      }),
+    },
+    async ({ limit }) =>
+      guard(async () => {
+        const ctx = await requireAuthContext();
+        await requirePermission("email.view");
+        const creds = await resolveEmailCredentials(ctx.workspace.id);
+        if (!creds) {
+          return fail(
+            "No mailbox is connected. Connect your business email in Settings before reading the inbox."
+          );
+        }
+        return ok(await fetchInbox(creds, { limit: limit ?? 25 }));
+      })
+  );
+
+  server.registerTool(
+    "list_sent_emails",
+    {
+      title: "List sent emails",
+      description:
+        "List emails previously sent from the workspace's connected mailbox.",
+      inputSchema: z.object({}),
+    },
+    async () => guard(async () => ok(await getSentEmails(await workspaceId())))
   );
 
   // ------------------------------------------------------------ ai helpers

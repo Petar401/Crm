@@ -163,7 +163,8 @@ Notes:
 - Claude's free plan allows one custom connector, which is enough for this.
 - Tools available: search, list/get for companies, contacts, deals, tasks, notes, notebook notes,
   leads, pipelines and team members; `create_record` / `update_record` / `delete_record` across
-  those entities; `log_activity`; and the CRM's own AI helpers.
+  those entities; `log_activity`; email tools (`send_email`, `list_inbox_messages`,
+  `list_sent_emails`); and the CRM's own AI helpers.
 
 ## Security model
 
