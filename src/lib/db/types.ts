@@ -795,3 +795,38 @@ export interface Subscription {
   created_at: string;
   updated_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Calendar sync accounts (0034_calendar_accounts.sql)
+// ---------------------------------------------------------------------------
+
+export type CalendarProvider = "google" | "microsoft";
+
+export interface CalendarAccount {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  provider: CalendarProvider;
+  external_account_email: string;
+  external_calendar_id: string;
+  encrypted_tokens: string;
+  sync_token: string | null;
+  channel_id: string | null;
+  channel_resource_id: string | null;
+  channel_expiry: string | null;
+  last_sync_at: string | null;
+  last_sync_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarOAuthState {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  provider: CalendarProvider;
+  state: string;
+  code_verifier: string | null;
+  expires_at: string;
+  created_at: string;
+}
