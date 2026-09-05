@@ -11,6 +11,10 @@ import {
   Sparkles,
   Target,
   Mail,
+  Package,
+  FileText,
+  CreditCard,
+  Calendar,
   type LucideIcon,
 } from "lucide-react";
 
@@ -70,9 +74,33 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/invoices",
-    label: "Invoices",
+    label: "Receipts",
     icon: Receipt,
     permission: "invoices.view",
+  },
+  {
+    href: "/products",
+    label: "Products",
+    icon: Package,
+    permission: "products.view",
+  },
+  {
+    href: "/quotes",
+    label: "Quotes",
+    icon: FileText,
+    permission: "quotes.view",
+  },
+  {
+    href: "/billing",
+    label: "Billing",
+    icon: CreditCard,
+    permission: "billing.view",
+  },
+  {
+    href: "/calendar",
+    label: "Calendar",
+    icon: Calendar,
+    permission: "calendar.view",
   },
   {
     href: "/aria",
