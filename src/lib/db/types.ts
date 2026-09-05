@@ -661,3 +661,53 @@ export interface BillingPayment {
   recorded_by: string | null;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Calendar events (0033_calendar_events.sql)
+// ---------------------------------------------------------------------------
+
+export type CalendarEventSource = "internal" | "google" | "microsoft";
+export type CalendarEventStatus = "confirmed" | "cancelled";
+export type AttendeeResponse =
+  | "needs_action"
+  | "accepted"
+  | "declined"
+  | "tentative";
+
+export interface CalendarEvent {
+  id: string;
+  workspace_id: string;
+  owner_user_id: string | null;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start_at: string;
+  end_at: string;
+  all_day: boolean;
+  timezone: string | null;
+  status: CalendarEventStatus;
+  source: CalendarEventSource;
+  external_id: string | null;
+  external_etag: string | null;
+  external_calendar_id: string | null;
+  rrule: string | null;
+  deal_id: string | null;
+  company_id: string | null;
+  contact_id: string | null;
+  lead_id: string | null;
+  cancelled_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarEventAttendee {
+  id: string;
+  event_id: string;
+  contact_id: string | null;
+  user_id: string | null;
+  email: string;
+  name: string | null;
+  response: AttendeeResponse;
+  created_at: string;
+}
