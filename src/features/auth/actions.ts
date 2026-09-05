@@ -83,16 +83,10 @@ export async function signupAction(values: unknown): Promise<ActionResult> {
     }
   }
 
-  // Session active — join the single shared workspace (the first user ever
-  // bootstraps it). Everyone shares the same companies, notes, files, etc.
-  const { error: rpcError } = await supabase.rpc(
-    "join_or_create_shared_workspace",
-    {}
-  );
-  if (rpcError) return { error: rpcError.message };
-
+  // The user is signed in but has no workspace yet. Route them to the
+  // onboarding wizard, which creates the workspace and seeds their profile.
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect("/onboarding");
 }
 
 export async function forgotPasswordAction(
@@ -187,25 +181,7 @@ export async function signOutAction(): Promise<void> {
   redirect("/login");
 }
 
-/**
- * Joins an authenticated user who has no workspace yet into the single shared
- * workspace (onboarding fallback). The provided name is only used to name the
- * workspace when this is the very first user and none exists yet.
- */
-export async function createWorkspaceAction(
-  workspaceName: string
-): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { error } = await supabase.rpc("join_or_create_shared_workspace", {
-    workspace_name: workspaceName,
-  });
-  if (error) return { error: error.message };
-
-  revalidatePath("/", "layout");
-  redirect("/");
-}
+// Workspace creation now lives in `features/workspaces/actions.ts`
+// (`createWorkspaceAction`) so it can carry the full onboarding profile and
+// audit log. The legacy `createWorkspaceAction` export has been removed;
+// callers should import from the workspaces module.

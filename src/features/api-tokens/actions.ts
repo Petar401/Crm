@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
+import { auditLog } from "@/features/audit/log";
 import {
   createApiTokenSchema,
   TOKEN_PLAINTEXT_PREFIX,
@@ -53,6 +54,15 @@ export async function createApiToken(
 
   if (error) return { error: error.message };
 
+  await auditLog({
+    workspaceId: ctx.workspace.id,
+    actorUserId: ctx.userId,
+    action: "api_token.created",
+    entityType: "api_token",
+    entityId: data.id,
+    after: { name: parsed.data.name },
+  });
+
   revalidatePath("/settings");
   return { id: data.id, token: plaintext };
 }
@@ -69,6 +79,14 @@ export async function revokeApiToken(id: string): Promise<ActionResult> {
     .eq("workspace_member_id", ctx.member.id);
 
   if (error) return { error: error.message };
+
+  await auditLog({
+    workspaceId: ctx.workspace.id,
+    actorUserId: ctx.userId,
+    action: "api_token.revoked",
+    entityType: "api_token",
+    entityId: id,
+  });
 
   revalidatePath("/settings");
   return {};

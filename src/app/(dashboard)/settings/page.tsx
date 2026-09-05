@@ -6,6 +6,9 @@ import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
 import { getMembers } from "@/features/team/queries";
 import { getApiTokens } from "@/features/api-tokens/queries";
+import { getRoles } from "@/features/permissions/queries";
+import { getAuditLogs } from "@/features/audit/queries";
+import { getNotificationPreferences } from "@/features/notifications/queries";
 import { ConnectorsPanel } from "@/features/api-tokens/components/connectors-panel";
 import {
   isAiConfigured,
@@ -29,6 +32,9 @@ import {
 import { EmailConnectionSettings } from "@/features/email/components/email-connection-settings";
 import { TeamSettings } from "@/features/team/components/team-settings";
 import { InviteMemberDialog } from "@/features/team/components/invite-member-dialog";
+import { RoleManager } from "@/features/permissions/components/role-manager";
+import { AuditLogTable } from "@/features/audit/components/audit-log-table";
+import { PreferencesPanel } from "@/features/notifications/components/preferences-panel";
 import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +53,7 @@ export default async function SettingsPage() {
   const canEditRoles = allowed.has("team.edit_roles");
   const canManageTokens = allowed.has("settings.tokens");
   const canManageAiKey = allowed.has("settings.update");
+  const canViewAudit = allowed.has("audit.view");
 
   const [
     tokens,
@@ -57,6 +64,9 @@ export default async function SettingsPage() {
     apolloSettings,
     emailConfigured,
     emailSettings,
+    roles,
+    auditRows,
+    notificationPrefs,
   ] = await Promise.all([
     canManageTokens ? getApiTokens(ctx.member.id) : Promise.resolve([]),
     isAiConfigured(ctx.workspace.id),
@@ -66,6 +76,9 @@ export default async function SettingsPage() {
     canManageAiKey ? getWorkspaceApolloSettings(ctx.workspace.id) : Promise.resolve(null),
     isEmailConfigured(ctx.workspace.id),
     canManageAiKey ? getWorkspaceEmailSettings(ctx.workspace.id) : Promise.resolve(null),
+    canViewTeam ? getRoles(ctx.workspace.id) : Promise.resolve([]),
+    canViewAudit ? getAuditLogs(ctx.workspace.id, { limit: 100 }) : Promise.resolve([]),
+    getNotificationPreferences(),
   ]);
   const headerList = await headers();
   const origin =
@@ -94,6 +107,12 @@ export default async function SettingsPage() {
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Slug</span>
               <span className="font-mono text-xs">{ctx.workspace.slug}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Timezone / Currency</span>
+              <span className="font-mono text-xs">
+                {ctx.workspace.timezone} · {ctx.workspace.currency}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">AI features</span>
@@ -175,6 +194,15 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Notification preferences</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PreferencesPanel initial={notificationPrefs} />
+          </CardContent>
+        </Card>
+
         {canManageTokens && (
           <Card>
             <CardHeader>
@@ -182,6 +210,17 @@ export default async function SettingsPage() {
             </CardHeader>
             <CardContent>
               <ConnectorsPanel tokens={tokens} mcpUrl={mcpUrl} />
+            </CardContent>
+          </Card>
+        )}
+
+        {canViewTeam && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Roles</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RoleManager roles={roles} canEdit={canEditRoles} />
             </CardContent>
           </Card>
         )}
@@ -203,6 +242,17 @@ export default async function SettingsPage() {
               </p>
             )}
           </div>
+        )}
+
+        {canViewAudit && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Audit log</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AuditLogTable rows={auditRows} />
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

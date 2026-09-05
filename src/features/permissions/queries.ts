@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { PERMISSION_KEYS, type PermissionKey } from "@/lib/constants/permissions";
-import type { WorkspaceMember } from "@/lib/db/types";
+import type { Role, WorkspaceMember } from "@/lib/db/types";
 
 export interface MemberPermissionState {
   isFullAccess: boolean;
@@ -57,6 +57,17 @@ export async function getMemberPermissionState(
   }
 
   return { isFullAccess: member.is_full_access, effective };
+}
+
+/** All roles defined for the workspace, ordered by name. */
+export async function getRoles(workspaceId: string): Promise<Role[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("roles")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("name", { ascending: true });
+  return (data ?? []) as Role[];
 }
 
 export type { PermissionKey };

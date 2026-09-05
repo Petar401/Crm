@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
+import { notify } from "@/features/notifications/emit";
 import { taskSchema, type TaskInput } from "@/features/tasks/schemas";
 
 export interface ActionResult {
@@ -60,6 +61,20 @@ export async function createTask(values: unknown): Promise<ActionResult> {
     taskId: data.id,
   });
 
+  if (row.assigned_to && row.assigned_to !== ctx.userId) {
+    await notify({
+      workspaceId: ctx.workspace.id,
+      userIds: [row.assigned_to],
+      kind: "task_assigned",
+      title: `${ctx.profile?.full_name ?? "Someone"} assigned you a task`,
+      body: parsed.data.title,
+      url: `/tasks`,
+      entityType: "task",
+      entityId: data.id,
+      actorUserId: ctx.userId,
+    });
+  }
+
   revalidatePath("/tasks");
   return { id: data.id };
 }
@@ -77,13 +92,38 @@ export async function updateTask(
   await requirePermission("tasks.update");
 
   const supabase = await createClient();
+  const { data: prev } = await supabase
+    .from("tasks")
+    .select("assigned_to")
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspace.id)
+    .maybeSingle<{ assigned_to: string | null }>();
+  const nextRow = toRow(parsed.data);
   const { error } = await supabase
     .from("tasks")
-    .update(toRow(parsed.data))
+    .update(nextRow)
     .eq("id", id)
     .eq("workspace_id", ctx.workspace.id);
 
   if (error) return { error: error.message };
+
+  if (
+    nextRow.assigned_to &&
+    nextRow.assigned_to !== prev?.assigned_to &&
+    nextRow.assigned_to !== ctx.userId
+  ) {
+    await notify({
+      workspaceId: ctx.workspace.id,
+      userIds: [nextRow.assigned_to],
+      kind: "task_assigned",
+      title: `${ctx.profile?.full_name ?? "Someone"} assigned you a task`,
+      body: parsed.data.title,
+      url: `/tasks`,
+      entityType: "task",
+      entityId: id,
+      actorUserId: ctx.userId,
+    });
+  }
 
   revalidatePath("/tasks");
   return { id };

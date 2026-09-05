@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
+import { notify } from "@/features/notifications/emit";
 import { dealSchema } from "@/features/deals/schemas";
 import type { DealInput } from "@/features/deals/schemas";
 
@@ -109,6 +110,13 @@ export async function moveDealStage(
   await requirePermission("deals.update");
 
   const supabase = await createClient();
+  const { data: prev } = await supabase
+    .from("deals")
+    .select("name, owner_user_id")
+    .eq("id", dealId)
+    .eq("workspace_id", ctx.workspace.id)
+    .maybeSingle<{ name: string; owner_user_id: string | null }>();
+
   const { error } = await supabase
     .from("deals")
     .update({ stage_id: stageId })
@@ -124,6 +132,19 @@ export async function moveDealStage(
     title: `Moved to ${stageName}`,
     dealId,
   });
+
+  if (prev?.owner_user_id && prev.owner_user_id !== ctx.userId) {
+    await notify({
+      workspaceId: ctx.workspace.id,
+      userIds: [prev.owner_user_id],
+      kind: "deal_stage_changed",
+      title: `${prev.name} → ${stageName}`,
+      url: `/deals/${dealId}`,
+      entityType: "deal",
+      entityId: dealId,
+      actorUserId: ctx.userId,
+    });
+  }
 
   revalidatePath("/deals");
   return { id: dealId };

@@ -1,10 +1,13 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/db/types";
+
+export const ACTIVE_WORKSPACE_COOKIE = "active_workspace_id";
 
 export interface AuthContext {
   userId: string;
@@ -65,13 +68,41 @@ export async function loadAuthContextForUser(
   userId: string,
   email: string
 ): Promise<AuthContext | null> {
-  const { data: member } = await db
-    .from("workspace_members")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle<WorkspaceMember>();
+  // Prefer the active-workspace cookie when the caller is a real browser
+  // session. The MCP bearer-token path runs under runWithAuthOverride and
+  // returns early before ever reaching this function, so there is no cookie
+  // to conflict with there.
+  let activeId: string | null = null;
+  try {
+    const jar = await cookies();
+    activeId = jar.get(ACTIVE_WORKSPACE_COOKIE)?.value ?? null;
+  } catch {
+    // cookies() can throw outside a request scope (e.g. in tests). Fall
+    // through to first-membership.
+  }
+
+  let member: WorkspaceMember | null = null;
+
+  if (activeId) {
+    const { data } = await db
+      .from("workspace_members")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("workspace_id", activeId)
+      .maybeSingle<WorkspaceMember>();
+    member = data ?? null;
+  }
+
+  if (!member) {
+    const { data } = await db
+      .from("workspace_members")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle<WorkspaceMember>();
+    member = data ?? null;
+  }
 
   if (!member) return null;
 

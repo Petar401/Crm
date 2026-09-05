@@ -40,6 +40,82 @@ export interface Workspace {
   slug: string;
   created_by: string | null;
   created_at: string;
+  industry: string | null;
+  timezone: string;
+  currency: string;
+  locale: string;
+  logo_url: string | null;
+}
+
+export interface WorkspaceInvitation {
+  id: string;
+  workspace_id: string;
+  email: string;
+  role_id: string | null;
+  token: string;
+  invited_by: string | null;
+  expires_at: string;
+  accepted_at: string | null;
+  accepted_by: string | null;
+  created_at: string;
+}
+
+export interface WorkspaceOnboarding {
+  workspace_id: string;
+  completed_steps: number[];
+  template_key: string | null;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export type NotificationKind =
+  | "task_assigned"
+  | "task_due_soon"
+  | "deal_stage_changed"
+  | "deal_won"
+  | "mention"
+  | "lead_scored"
+  | "campaign_finished"
+  | "email_received"
+  | "workspace_invited"
+  | "member_joined";
+
+export interface Notification {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string | null;
+  url: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  actor_user_id: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationPreference {
+  user_id: string;
+  workspace_id: string;
+  kind: NotificationKind;
+  in_app: boolean;
+  email: boolean;
+  updated_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  workspace_id: string;
+  actor_user_id: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  before: unknown;
+  after: unknown;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
 }
 
 export interface WorkspaceMember {
