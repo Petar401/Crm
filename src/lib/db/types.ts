@@ -78,6 +78,10 @@ export type NotificationKind =
   | "campaign_finished"
   | "email_received"
   | "workspace_invited"
+  | "quote_signed"
+  | "invoice_paid"
+  | "invoice_overdue"
+  | "booking_created"
   | "member_joined";
 
 export interface Notification {
@@ -528,5 +532,301 @@ export interface PriceBookEntry {
   price_book_id: string;
   product_id: string;
   unit_price: number;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Quotes (0030_quotes.sql)
+// ---------------------------------------------------------------------------
+
+export type QuoteStatus = "draft" | "sent" | "signed" | "expired" | "void";
+
+export interface Quote {
+  id: string;
+  workspace_id: string;
+  number: string;
+  deal_id: string | null;
+  company_id: string | null;
+  contact_id: string | null;
+  status: QuoteStatus;
+  currency: string;
+  subtotal_minor: number;
+  tax_minor: number;
+  discount_minor: number;
+  total_minor: number;
+  valid_until: string | null;
+  notes: string | null;
+  sent_at: string | null;
+  signed_at: string | null;
+  signed_by_name: string | null;
+  signed_by_email: string | null;
+  signed_ip: string | null;
+  signature_svg: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteLine {
+  id: string;
+  quote_id: string;
+  product_id: string | null;
+  position: number;
+  description: string;
+  quantity: number;
+  unit_price_minor: number;
+  discount_bps: number;
+  tax_rate_id: string | null;
+  tax_rate_bps: number;
+  line_subtotal_minor: number;
+  line_tax_minor: number;
+  line_total_minor: number;
+  created_at: string;
+}
+
+export interface QuoteShareToken {
+  id: string;
+  quote_id: string;
+  token_hash: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Billing invoices (0031_billing_invoices.sql) — real invoice objects, distinct
+// from the receipt cabinet in `invoices` (0019_invoices.sql).
+// ---------------------------------------------------------------------------
+
+export type BillingInvoiceStatus =
+  | "draft"
+  | "open"
+  | "paid"
+  | "uncollectible"
+  | "void";
+
+export interface BillingInvoice {
+  id: string;
+  workspace_id: string;
+  number: string;
+  deal_id: string | null;
+  quote_id: string | null;
+  company_id: string | null;
+  contact_id: string | null;
+  status: BillingInvoiceStatus;
+  currency: string;
+  subtotal_minor: number;
+  tax_minor: number;
+  discount_minor: number;
+  total_minor: number;
+  amount_paid_minor: number;
+  issued_at: string | null;
+  due_date: string | null;
+  paid_at: string | null;
+  memo: string | null;
+  external_ref: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingInvoiceLine {
+  id: string;
+  billing_invoice_id: string;
+  product_id: string | null;
+  position: number;
+  description: string;
+  quantity: number;
+  unit_price_minor: number;
+  discount_bps: number;
+  tax_rate_id: string | null;
+  tax_rate_bps: number;
+  line_subtotal_minor: number;
+  line_tax_minor: number;
+  line_total_minor: number;
+  created_at: string;
+}
+
+export interface BillingPayment {
+  id: string;
+  billing_invoice_id: string;
+  workspace_id: string;
+  amount_minor: number;
+  currency: string;
+  method: string | null;
+  external_ref: string | null;
+  paid_at: string;
+  note: string | null;
+  recorded_by: string | null;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Calendar events (0033_calendar_events.sql)
+// ---------------------------------------------------------------------------
+
+export type CalendarEventSource = "internal" | "google" | "microsoft";
+export type CalendarEventStatus = "confirmed" | "cancelled";
+export type AttendeeResponse =
+  | "needs_action"
+  | "accepted"
+  | "declined"
+  | "tentative";
+
+export interface CalendarEvent {
+  id: string;
+  workspace_id: string;
+  owner_user_id: string | null;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start_at: string;
+  end_at: string;
+  all_day: boolean;
+  timezone: string | null;
+  status: CalendarEventStatus;
+  source: CalendarEventSource;
+  external_id: string | null;
+  external_etag: string | null;
+  external_calendar_id: string | null;
+  rrule: string | null;
+  deal_id: string | null;
+  company_id: string | null;
+  contact_id: string | null;
+  lead_id: string | null;
+  cancelled_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarEventAttendee {
+  id: string;
+  event_id: string;
+  contact_id: string | null;
+  user_id: string | null;
+  email: string;
+  name: string | null;
+  response: AttendeeResponse;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Scheduling links + bookings (0035_scheduling_links.sql)
+// ---------------------------------------------------------------------------
+
+export interface AvailabilityWindow {
+  start: string; // "09:00"
+  end: string;   // "17:00"
+}
+
+export type Availability = Partial<
+  Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", AvailabilityWindow[]>
+>;
+
+export interface SchedulingLink {
+  id: string;
+  workspace_id: string;
+  owner_user_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  duration_minutes: number;
+  buffer_before_minutes: number;
+  buffer_after_minutes: number;
+  timezone: string;
+  availability: Availability;
+  min_notice_minutes: number;
+  max_days_ahead: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type BookingStatus = "confirmed" | "cancelled";
+
+export interface Booking {
+  id: string;
+  scheduling_link_id: string;
+  calendar_event_id: string | null;
+  invitee_name: string;
+  invitee_email: string;
+  invitee_notes: string | null;
+  contact_id: string | null;
+  status: BookingStatus;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Stripe billing settings (0032_stripe.sql) — behind a per-workspace flag.
+// ---------------------------------------------------------------------------
+
+export interface WorkspaceBillingSettings {
+  workspace_id: string;
+  stripe_enabled: boolean;
+  stripe_publishable_key: string | null;
+  encrypted_stripe_secret_key: string | null;
+  webhook_secret: string | null;
+  webhook_endpoint_slug: string | null;
+  auto_invoice_on_won: boolean;
+  send_dunning: boolean;
+  dunning_schedule_days: number[];
+  tax_inclusive: boolean;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SubscriptionStatus = "active" | "past_due" | "cancelled" | "paused";
+
+export interface Subscription {
+  id: string;
+  workspace_id: string;
+  company_id: string | null;
+  product_id: string | null;
+  quantity: number;
+  currency: string;
+  interval: RecurringInterval;
+  external_ref: string | null;
+  status: SubscriptionStatus;
+  current_period_end: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Calendar sync accounts (0034_calendar_accounts.sql)
+// ---------------------------------------------------------------------------
+
+export type CalendarProvider = "google" | "microsoft";
+
+export interface CalendarAccount {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  provider: CalendarProvider;
+  external_account_email: string;
+  external_calendar_id: string;
+  encrypted_tokens: string;
+  sync_token: string | null;
+  channel_id: string | null;
+  channel_resource_id: string | null;
+  channel_expiry: string | null;
+  last_sync_at: string | null;
+  last_sync_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarOAuthState {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  provider: CalendarProvider;
+  state: string;
+  code_verifier: string | null;
+  expires_at: string;
   created_at: string;
 }
