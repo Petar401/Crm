@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
+import { notify } from "@/features/notifications/emit";
+import { auditLog } from "@/features/audit/log";
 
 export interface ActionResult {
   error?: string;
@@ -78,6 +80,24 @@ export async function inviteMember(values: unknown): Promise<ActionResult> {
     return { error: memberError.message };
   }
 
+  await notify({
+    workspaceId: ctx.workspace.id,
+    userIds: [userId],
+    kind: "workspace_invited",
+    title: `You joined ${ctx.workspace.name}`,
+    url: "/",
+    actorUserId: ctx.userId,
+  });
+
+  await auditLog({
+    workspaceId: ctx.workspace.id,
+    actorUserId: ctx.userId,
+    action: "member.added",
+    entityType: "member",
+    entityId: userId,
+    after: { email },
+  });
+
   revalidatePath("/settings");
   return {};
 }
@@ -107,6 +127,15 @@ export async function removeMember(memberId: string): Promise<ActionResult> {
     .eq("workspace_id", ctx.workspace.id);
 
   if (error) return { error: error.message };
+
+  await auditLog({
+    workspaceId: ctx.workspace.id,
+    actorUserId: ctx.userId,
+    action: "member.removed",
+    entityType: "member",
+    entityId: memberId,
+    before: member ?? undefined,
+  });
 
   revalidatePath("/settings");
   return {};

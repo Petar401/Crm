@@ -46,7 +46,10 @@ insert into public.permissions (key, description) values
   ('leads.delete',     'Delete campaigns & leads'),
   ('leads.import',     'Import leads & enrich via Apollo.io (uses paid credits)'),
   ('email.view',       'View the mailbox & sent email'),
-  ('email.send',       'Compose & send email')
+  ('email.send',       'Compose & send email'),
+  ('notifications.view', 'View your notifications'),
+  ('audit.view',       'View the workspace audit log'),
+  ('settings.tokens',  'Create and revoke personal API tokens')
 on conflict (key) do update set description = excluded.description;
 
 -- Default role permissions template: grant a sensible read/write baseline to
@@ -69,6 +72,98 @@ where r.is_default
     'invoices.view','invoices.upload',
     'team.view','settings.view','ai.use',
     'leads.view','leads.create','leads.update',
-    'email.view','email.send'
+    'email.view','email.send',
+    'notifications.view'
   )
 on conflict (role_id, permission_key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Named-role catalog for every workspace. Owner + Admin get full access; the
+-- others are pre-scoped so an admin can drop a member into a role and they
+-- immediately have the right buttons. Owner is left as the workspace's default
+-- role so the schema invariant (exactly one default per workspace) holds.
+-- Idempotent: the same block re-runs after every seed.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  w record;
+  v_owner_role uuid;
+  v_admin_role uuid;
+  v_manager_role uuid;
+  v_sales_role uuid;
+  v_ro_role uuid;
+begin
+  for w in select id from public.workspaces loop
+    -- Preserve any pre-existing default role; if none, we'll flip Owner to default.
+    insert into public.roles (workspace_id, name) values (w.id, 'Owner')
+      on conflict (workspace_id, name) do nothing;
+    insert into public.roles (workspace_id, name) values (w.id, 'Admin')
+      on conflict (workspace_id, name) do nothing;
+    insert into public.roles (workspace_id, name) values (w.id, 'Manager')
+      on conflict (workspace_id, name) do nothing;
+    insert into public.roles (workspace_id, name) values (w.id, 'Sales Rep')
+      on conflict (workspace_id, name) do nothing;
+    insert into public.roles (workspace_id, name) values (w.id, 'Read-only')
+      on conflict (workspace_id, name) do nothing;
+
+    select id into v_owner_role   from public.roles where workspace_id = w.id and name = 'Owner';
+    select id into v_admin_role   from public.roles where workspace_id = w.id and name = 'Admin';
+    select id into v_manager_role from public.roles where workspace_id = w.id and name = 'Manager';
+    select id into v_sales_role   from public.roles where workspace_id = w.id and name = 'Sales Rep';
+    select id into v_ro_role      from public.roles where workspace_id = w.id and name = 'Read-only';
+
+    -- Owner + Admin: every permission.
+    insert into public.role_permissions (role_id, permission_key, allowed)
+    select r.id, p.key, true
+    from (values (v_owner_role), (v_admin_role)) r(id)
+    cross join public.permissions p
+    on conflict (role_id, permission_key) do nothing;
+
+    -- Manager: full CRM + notifications + AI + email + team.view + settings.view.
+    insert into public.role_permissions (role_id, permission_key, allowed)
+    select v_manager_role, p.key, true
+    from public.permissions p
+    where p.key in (
+      'companies.view','companies.create','companies.update','companies.delete',
+      'contacts.view','contacts.create','contacts.update','contacts.delete',
+      'deals.view','deals.create','deals.update','deals.delete',
+      'tasks.view','tasks.create','tasks.update','tasks.delete',
+      'notes.view','notes.create','notes.update','notes.delete',
+      'notebook.view','notebook.create','notebook.update','notebook.delete',
+      'files.view','files.upload','files.delete',
+      'invoices.view','invoices.upload','invoices.delete',
+      'leads.view','leads.create','leads.update','leads.delete','leads.import',
+      'team.view','settings.view',
+      'email.view','email.send','ai.use','notifications.view'
+    )
+    on conflict (role_id, permission_key) do nothing;
+
+    -- Sales Rep: work their pipeline; no destructive actions.
+    insert into public.role_permissions (role_id, permission_key, allowed)
+    select v_sales_role, p.key, true
+    from public.permissions p
+    where p.key in (
+      'companies.view','companies.create','companies.update',
+      'contacts.view','contacts.create','contacts.update',
+      'deals.view','deals.create','deals.update',
+      'tasks.view','tasks.create','tasks.update',
+      'notes.view','notes.create','notes.update',
+      'notebook.view','notebook.create',
+      'files.view','files.upload',
+      'leads.view','leads.update',
+      'email.view','email.send','ai.use','notifications.view'
+    )
+    on conflict (role_id, permission_key) do nothing;
+
+    -- Read-only: view everything, change nothing.
+    insert into public.role_permissions (role_id, permission_key, allowed)
+    select v_ro_role, p.key, true
+    from public.permissions p
+    where p.key in (
+      'companies.view','contacts.view','deals.view','tasks.view',
+      'notes.view','notebook.view','files.view','invoices.view',
+      'leads.view','team.view','email.view','notifications.view'
+    )
+    on conflict (role_id, permission_key) do nothing;
+  end loop;
+end $$;

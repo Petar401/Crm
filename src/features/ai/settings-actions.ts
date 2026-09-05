@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { encryptSecret } from "@/lib/security/secret-box";
+import { auditLog } from "@/features/audit/log";
 import { saveAiApiKeySchema } from "@/features/ai/settings-schemas";
 
 export interface ActionResult {
@@ -46,6 +47,14 @@ export async function saveAiApiKey(values: unknown): Promise<ActionResult> {
 
   if (error) return { error: error.message };
 
+  await auditLog({
+    workspaceId: ctx.workspace.id,
+    actorUserId: ctx.userId,
+    action: "settings.ai_key_saved",
+    entityType: "workspace_ai_settings",
+    after: { provider: parsed.data.provider, model: parsed.data.model || null },
+  });
+
   revalidatePath("/settings");
   return {};
 }
@@ -61,6 +70,13 @@ export async function clearAiApiKey(): Promise<ActionResult> {
     .eq("workspace_id", ctx.workspace.id);
 
   if (error) return { error: error.message };
+
+  await auditLog({
+    workspaceId: ctx.workspace.id,
+    actorUserId: ctx.userId,
+    action: "settings.ai_key_cleared",
+    entityType: "workspace_ai_settings",
+  });
 
   revalidatePath("/settings");
   return {};

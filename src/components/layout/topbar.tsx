@@ -6,6 +6,12 @@ import { LogOut, KeyRound } from "lucide-react";
 import { signOutAction } from "@/features/auth/actions";
 import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { CommandPaletteTrigger } from "@/components/layout/command-palette";
+import { NotificationsBell } from "@/features/notifications/components/notifications-bell";
+import {
+  WorkspaceSwitcher,
+  type WorkspaceSwitcherItem,
+} from "@/features/workspaces/components/workspace-switcher";
 import type { PermissionKey } from "@/lib/constants/permissions";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -26,17 +32,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface TopbarProps {
-  workspaceName: string;
+  workspaces: WorkspaceSwitcherItem[];
+  activeWorkspaceId: string;
   email: string;
   fullName: string | null;
   allowed: PermissionKey[];
+  unreadNotifications: number;
 }
 
 export function Topbar({
-  workspaceName,
+  workspaces,
+  activeWorkspaceId,
   email,
   fullName,
   allowed,
+  unreadNotifications,
 }: TopbarProps) {
   const [passwordOpen, setPasswordOpen] = useState(false);
 
@@ -51,9 +61,13 @@ export function Topbar({
     <header className="bg-background flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4 md:px-6">
       <div className="flex min-w-0 items-center gap-2">
         <MobileNav allowed={allowed} />
-        <p className="truncate text-sm font-semibold">{workspaceName}</p>
+        <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} />
+      </div>
+      <div className="flex flex-1 justify-center px-4">
+        <CommandPaletteTrigger />
       </div>
       <div className="flex items-center gap-1">
+        <NotificationsBell initialUnread={unreadNotifications} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
