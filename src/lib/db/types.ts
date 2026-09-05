@@ -711,3 +711,49 @@ export interface CalendarEventAttendee {
   response: AttendeeResponse;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Scheduling links + bookings (0035_scheduling_links.sql)
+// ---------------------------------------------------------------------------
+
+export interface AvailabilityWindow {
+  start: string; // "09:00"
+  end: string;   // "17:00"
+}
+
+export type Availability = Partial<
+  Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", AvailabilityWindow[]>
+>;
+
+export interface SchedulingLink {
+  id: string;
+  workspace_id: string;
+  owner_user_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  duration_minutes: number;
+  buffer_before_minutes: number;
+  buffer_after_minutes: number;
+  timezone: string;
+  availability: Availability;
+  min_notice_minutes: number;
+  max_days_ahead: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type BookingStatus = "confirmed" | "cancelled";
+
+export interface Booking {
+  id: string;
+  scheduling_link_id: string;
+  calendar_event_id: string | null;
+  invitee_name: string;
+  invitee_email: string;
+  invitee_notes: string | null;
+  contact_id: string | null;
+  status: BookingStatus;
+  created_at: string;
+}
