@@ -476,3 +476,57 @@ export interface Email {
   sent_at: string | null;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Products, price books, tax rates (0029_products.sql)
+// ---------------------------------------------------------------------------
+
+export type ProductKind = "one_time" | "recurring";
+export type RecurringInterval = "day" | "week" | "month" | "year";
+
+export interface TaxRate {
+  id: string;
+  workspace_id: string;
+  name: string;
+  rate_bps: number;
+  region: string | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Product {
+  id: string;
+  workspace_id: string;
+  sku: string | null;
+  name: string;
+  description: string | null;
+  kind: ProductKind;
+  recurring_interval: RecurringInterval | null;
+  unit: string;
+  default_currency: string;
+  default_price: number;
+  default_tax_rate_id: string | null;
+  is_archived: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PriceBook {
+  id: string;
+  workspace_id: string;
+  name: string;
+  currency: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PriceBookEntry {
+  id: string;
+  price_book_id: string;
+  product_id: string;
+  unit_price: number;
+  created_at: string;
+}

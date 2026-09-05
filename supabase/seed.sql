@@ -49,7 +49,27 @@ insert into public.permissions (key, description) values
   ('email.send',       'Compose & send email'),
   ('notifications.view', 'View your notifications'),
   ('audit.view',       'View the workspace audit log'),
-  ('settings.tokens',  'Create and revoke personal API tokens')
+  ('settings.tokens',  'Create and revoke personal API tokens'),
+  ('products.view',    'View products, price books & tax rates'),
+  ('products.create',  'Create products & pricing'),
+  ('products.update',  'Edit products & pricing'),
+  ('products.delete',  'Delete products & pricing'),
+  ('quotes.view',      'View quotes'),
+  ('quotes.create',    'Create quotes'),
+  ('quotes.update',    'Edit quotes'),
+  ('quotes.delete',    'Delete quotes'),
+  ('quotes.send',      'Send quotes & share links'),
+  ('billing.view',     'View billing invoices & payments'),
+  ('billing.create',   'Create billing invoices'),
+  ('billing.update',   'Edit billing invoices'),
+  ('billing.delete',   'Void or delete billing invoices'),
+  ('billing.send',     'Send billing invoices & take payment'),
+  ('calendar.view',    'View the calendar & events'),
+  ('calendar.create',  'Create calendar events'),
+  ('calendar.update',  'Edit calendar events'),
+  ('calendar.delete',  'Delete calendar events'),
+  ('scheduling.view',  'View public booking links'),
+  ('scheduling.manage','Create & manage public booking links')
 on conflict (key) do update set description = excluded.description;
 
 -- Default role permissions template: grant a sensible read/write baseline to
