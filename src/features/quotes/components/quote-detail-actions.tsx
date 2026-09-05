@@ -2,10 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Download, FileSignature, Link2, Pencil, XCircle } from "lucide-react";
+import {
+  Copy,
+  CreditCard,
+  Download,
+  FileSignature,
+  Link2,
+  Pencil,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { createShareLink, markSent, voidQuote } from "@/features/quotes/actions";
+import { generateInvoiceFromQuote } from "@/features/billing/actions";
 import type { Quote } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,9 +31,15 @@ interface Props {
   quote: Quote;
   canUpdate: boolean;
   canSend: boolean;
+  canBill: boolean;
 }
 
-export function QuoteDetailActions({ quote, canUpdate, canSend }: Props) {
+export function QuoteDetailActions({
+  quote,
+  canUpdate,
+  canSend,
+  canBill,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [shareOpen, setShareOpen] = useState(false);
@@ -95,6 +110,25 @@ export function QuoteDetailActions({ quote, canUpdate, canSend }: Props) {
         <Button variant="outline" onClick={send} disabled={pending}>
           <FileSignature className="size-4" />
           Mark sent
+        </Button>
+      )}
+      {canBill && quote.status === "signed" && (
+        <Button
+          variant="outline"
+          onClick={() =>
+            startTransition(async () => {
+              const r = await generateInvoiceFromQuote(quote.id);
+              if (r.error) toast.error(r.error);
+              else {
+                toast.success("Invoice generated");
+                router.push(`/billing/${r.id}`);
+              }
+            })
+          }
+          disabled={pending}
+        >
+          <CreditCard className="size-4" />
+          Generate invoice
         </Button>
       )}
       {canUpdate && canEdit && (

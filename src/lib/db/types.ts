@@ -593,3 +593,71 @@ export interface QuoteShareToken {
   created_by: string | null;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Billing invoices (0031_billing_invoices.sql) — real invoice objects, distinct
+// from the receipt cabinet in `invoices` (0019_invoices.sql).
+// ---------------------------------------------------------------------------
+
+export type BillingInvoiceStatus =
+  | "draft"
+  | "open"
+  | "paid"
+  | "uncollectible"
+  | "void";
+
+export interface BillingInvoice {
+  id: string;
+  workspace_id: string;
+  number: string;
+  deal_id: string | null;
+  quote_id: string | null;
+  company_id: string | null;
+  contact_id: string | null;
+  status: BillingInvoiceStatus;
+  currency: string;
+  subtotal_minor: number;
+  tax_minor: number;
+  discount_minor: number;
+  total_minor: number;
+  amount_paid_minor: number;
+  issued_at: string | null;
+  due_date: string | null;
+  paid_at: string | null;
+  memo: string | null;
+  external_ref: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingInvoiceLine {
+  id: string;
+  billing_invoice_id: string;
+  product_id: string | null;
+  position: number;
+  description: string;
+  quantity: number;
+  unit_price_minor: number;
+  discount_bps: number;
+  tax_rate_id: string | null;
+  tax_rate_bps: number;
+  line_subtotal_minor: number;
+  line_tax_minor: number;
+  line_total_minor: number;
+  created_at: string;
+}
+
+export interface BillingPayment {
+  id: string;
+  billing_invoice_id: string;
+  workspace_id: string;
+  amount_minor: number;
+  currency: string;
+  method: string | null;
+  external_ref: string | null;
+  paid_at: string;
+  note: string | null;
+  recorded_by: string | null;
+  created_at: string;
+}

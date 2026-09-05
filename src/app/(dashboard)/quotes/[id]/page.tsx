@@ -59,6 +59,7 @@ export default async function QuoteDetailPage({
             quote={quote}
             canUpdate={allowed.has("quotes.update")}
             canSend={allowed.has("quotes.send")}
+            canBill={allowed.has("billing.create")}
           />
         }
       />
