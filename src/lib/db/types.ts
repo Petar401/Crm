@@ -78,6 +78,10 @@ export type NotificationKind =
   | "campaign_finished"
   | "email_received"
   | "workspace_invited"
+  | "quote_signed"
+  | "invoice_paid"
+  | "invoice_overdue"
+  | "booking_created"
   | "member_joined";
 
 export interface Notification {
@@ -528,5 +532,64 @@ export interface PriceBookEntry {
   price_book_id: string;
   product_id: string;
   unit_price: number;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Quotes (0030_quotes.sql)
+// ---------------------------------------------------------------------------
+
+export type QuoteStatus = "draft" | "sent" | "signed" | "expired" | "void";
+
+export interface Quote {
+  id: string;
+  workspace_id: string;
+  number: string;
+  deal_id: string | null;
+  company_id: string | null;
+  contact_id: string | null;
+  status: QuoteStatus;
+  currency: string;
+  subtotal_minor: number;
+  tax_minor: number;
+  discount_minor: number;
+  total_minor: number;
+  valid_until: string | null;
+  notes: string | null;
+  sent_at: string | null;
+  signed_at: string | null;
+  signed_by_name: string | null;
+  signed_by_email: string | null;
+  signed_ip: string | null;
+  signature_svg: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteLine {
+  id: string;
+  quote_id: string;
+  product_id: string | null;
+  position: number;
+  description: string;
+  quantity: number;
+  unit_price_minor: number;
+  discount_bps: number;
+  tax_rate_id: string | null;
+  tax_rate_bps: number;
+  line_subtotal_minor: number;
+  line_tax_minor: number;
+  line_total_minor: number;
+  created_at: string;
+}
+
+export interface QuoteShareToken {
+  id: string;
+  quote_id: string;
+  token_hash: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_by: string | null;
   created_at: string;
 }

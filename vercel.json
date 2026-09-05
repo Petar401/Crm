@@ -1,4 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "functions": {
+    "src/app/api/quotes/**": {
+      "maxDuration": 60
+    },
+    "src/app/api/billing/**": {
+      "maxDuration": 60
+    }
+  }
 }
