@@ -79,7 +79,19 @@ NEXT_PUBLIC_SUPABASE_URL=        # Project URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY=   # anon/public key
 SUPABASE_SERVICE_ROLE_KEY=       # service role key (server-only)
 GROQ_API_KEY=                    # optional; default AI key (workspaces can set their own)
-AI_KEY_ENCRYPTION_SECRET=        # optional; required if workspaces set their own AI key
+AI_KEY_ENCRYPTION_SECRET=        # 32-byte hex; required for encrypted secrets (AI, Stripe, calendar OAuth)
+
+NEXT_PUBLIC_APP_URL=             # e.g. https://crm.example.com — needed for public share links, OAuth redirects, Stripe checkout return URLs
+CRON_SECRET=                     # shared bearer for /api/cron/* endpoints
+
+# Calendar sync (phase F). Set at least one provider to enable /settings/calendar.
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+MICROSOFT_OAUTH_CLIENT_ID=
+MICROSOFT_OAUTH_CLIENT_SECRET=
+MICROSOFT_OAUTH_TENANT=          # 'common' for multi-tenant, or your tenant id
+
+# Stripe (phase D) is per-workspace at runtime — no global env vars needed.
 ```
 
 Only `NEXT_PUBLIC_*` values are exposed to the browser. The service-role and Groq keys
