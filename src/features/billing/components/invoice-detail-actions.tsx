@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Download, FileSignature, Plus, XCircle } from "lucide-react";
+import { CreditCard, Download, FileSignature, Plus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,6 +43,7 @@ interface Props {
   canUpdate: boolean;
   canSend: boolean;
   canDelete: boolean;
+  stripeEnabled: boolean;
 }
 
 export function InvoiceDetailActions({
@@ -50,6 +51,7 @@ export function InvoiceDetailActions({
   canUpdate,
   canSend,
   canDelete,
+  stripeEnabled,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -107,6 +109,30 @@ export function InvoiceDetailActions({
         <Button variant="outline" onClick={issue} disabled={pending}>
           <FileSignature className="size-4" />
           Issue
+        </Button>
+      )}
+      {canSend && stripeEnabled && invoice.status === "open" && (
+        <Button
+          variant="outline"
+          onClick={() =>
+            startTransition(async () => {
+              const res = await fetch("/api/billing/stripe/checkout", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ invoiceId: invoice.id }),
+              });
+              const body = await res.json();
+              if (!res.ok || !body.url) {
+                toast.error(body.error ?? "Checkout failed");
+                return;
+              }
+              window.open(body.url, "_blank");
+            })
+          }
+          disabled={pending}
+        >
+          <CreditCard className="size-4" />
+          Pay with Stripe
         </Button>
       )}
       {canUpdate && canPay && (

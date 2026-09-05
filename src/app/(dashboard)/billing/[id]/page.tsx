@@ -9,6 +9,7 @@ import {
   getInvoiceLines,
   listPayments,
 } from "@/features/billing/queries";
+import { getBillingSettings } from "@/features/stripe/settings";
 import { InvoiceDetailActions } from "@/features/billing/components/invoice-detail-actions";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -44,9 +45,10 @@ export default async function InvoiceDetailPage({
   const invoice = await getInvoice(ctx.workspace.id, id);
   if (!invoice) notFound();
 
-  const [lines, payments] = await Promise.all([
+  const [lines, payments, billingSettings] = await Promise.all([
     getInvoiceLines(invoice.id),
     listPayments(invoice.id),
+    getBillingSettings(ctx.workspace.id),
   ]);
   const balance = Math.max(0, invoice.total_minor - invoice.amount_paid_minor);
 
@@ -69,6 +71,7 @@ export default async function InvoiceDetailPage({
             canUpdate={allowed.has("billing.update")}
             canSend={allowed.has("billing.send")}
             canDelete={allowed.has("billing.delete")}
+            stripeEnabled={billingSettings?.stripe_enabled ?? false}
           />
         }
       />

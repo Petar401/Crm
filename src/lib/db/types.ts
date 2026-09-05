@@ -757,3 +757,41 @@ export interface Booking {
   status: BookingStatus;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Stripe billing settings (0032_stripe.sql) — behind a per-workspace flag.
+// ---------------------------------------------------------------------------
+
+export interface WorkspaceBillingSettings {
+  workspace_id: string;
+  stripe_enabled: boolean;
+  stripe_publishable_key: string | null;
+  encrypted_stripe_secret_key: string | null;
+  webhook_secret: string | null;
+  webhook_endpoint_slug: string | null;
+  auto_invoice_on_won: boolean;
+  send_dunning: boolean;
+  dunning_schedule_days: number[];
+  tax_inclusive: boolean;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SubscriptionStatus = "active" | "past_due" | "cancelled" | "paused";
+
+export interface Subscription {
+  id: string;
+  workspace_id: string;
+  company_id: string | null;
+  product_id: string | null;
+  quantity: number;
+  currency: string;
+  interval: RecurringInterval;
+  external_ref: string | null;
+  status: SubscriptionStatus;
+  current_period_end: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
