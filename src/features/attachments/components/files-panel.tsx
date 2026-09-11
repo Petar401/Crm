@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Trash2, FileText, Download, Eye } from "lucide-react";
+import { Upload, Camera, Trash2, FileText, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
@@ -48,6 +48,7 @@ export function FilesPanel({
 }: FilesPanelProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
 
@@ -60,9 +61,7 @@ export function FilesPanel({
     });
   }
 
-  async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function uploadFile(file: File) {
     setUploading(true);
     try {
       const supabase = createClient();
@@ -98,7 +97,14 @@ export function FilesPanel({
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
     }
+  }
+
+  async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadFile(file);
   }
 
   async function remove(id: string) {
@@ -113,13 +119,30 @@ export function FilesPanel({
   return (
     <div className="space-y-4">
       {canUpload && (
-        <div>
+        <div className="flex items-center gap-2">
           <input
             ref={inputRef}
             type="file"
             className="hidden"
             onChange={onFileSelected}
           />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={onFileSelected}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={uploading}
+            onClick={() => cameraInputRef.current?.click()}
+          >
+            <Camera className="size-4" />
+            Take photo
+          </Button>
           <Button
             size="sm"
             variant="outline"

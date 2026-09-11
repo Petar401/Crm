@@ -1,14 +1,22 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { composeEmailSchema, type ComposeEmailInput } from "@/features/email/schemas";
 import { sendEmail } from "@/features/email/actions";
 import type { ContactEmailOption } from "@/features/email/queries";
+import type { AttachmentWithUrl } from "@/features/attachments/queries";
+import type { InvoiceWithUrl } from "@/features/invoices/queries";
+import {
+  AttachmentPicker,
+  type PickedAttachment,
+} from "@/features/email/components/attachment-picker";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,7 +49,10 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   contactOptions: ContactEmailOption[];
   companyOptions: { id: string; name: string }[];
+  attachmentOptions?: AttachmentWithUrl[];
+  invoiceOptions?: InvoiceWithUrl[];
   replyTo?: { to?: string; subject?: string };
+  initialAttachments?: PickedAttachment[];
 }
 
 const NONE = "__none__";
@@ -51,10 +62,16 @@ export function ComposeSheet({
   onOpenChange,
   contactOptions,
   companyOptions,
+  attachmentOptions = [],
+  invoiceOptions = [],
   replyTo,
+  initialAttachments = [],
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [selectedAttachments, setSelectedAttachments] =
+    useState<PickedAttachment[]>(initialAttachments);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const form = useForm<ComposeEmailInput>({
     resolver: zodResolver(composeEmailSchema),
@@ -70,9 +87,32 @@ export function ComposeSheet({
     },
   });
 
+  // Sync the pre-selected attachment (from a "Send via email" deep link) when
+  // the sheet transitions to open for a new message. Adjusted during render
+  // (not an effect) per React's guidance for resetting state on prop change.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setSelectedAttachments(initialAttachments);
+  }
+
+  function removeAttachment(item: PickedAttachment) {
+    setSelectedAttachments((prev) =>
+      prev.filter((p) => !(p.id === item.id && p.type === item.type))
+    );
+  }
+
   function onSubmit(values: ComposeEmailInput) {
     startTransition(async () => {
-      const result = await sendEmail(values);
+      const result = await sendEmail({
+        ...values,
+        attachmentIds: selectedAttachments
+          .filter((a) => a.type === "file")
+          .map((a) => a.id),
+        invoiceIds: selectedAttachments
+          .filter((a) => a.type === "invoice")
+          .map((a) => a.id),
+      });
       if (result.error) {
         toast.error(result.error);
         return;
@@ -80,6 +120,7 @@ export function ComposeSheet({
       toast.success("Email sent");
       onOpenChange(false);
       form.reset();
+      setSelectedAttachments([]);
       router.refresh();
     });
   }
@@ -227,6 +268,38 @@ export function ComposeSheet({
                 </FormItem>
               )}
             />
+            {(attachmentOptions.length > 0 || invoiceOptions.length > 0) && (
+              <FormItem>
+                <FormLabel>Attachments</FormLabel>
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedAttachments.map((item) => (
+                    <Badge
+                      key={`${item.type}-${item.id}`}
+                      variant="secondary"
+                      className="gap-1"
+                    >
+                      {item.name}
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(item)}
+                        aria-label={`Remove ${item.name}`}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPickerOpen(true)}
+                  >
+                    <Paperclip className="size-4" />
+                    Attach files
+                  </Button>
+                </div>
+              </FormItem>
+            )}
             <SheetFooter className="px-0">
               <Button type="submit" disabled={pending}>
                 {pending ? "Sending…" : "Send email"}
@@ -235,6 +308,14 @@ export function ComposeSheet({
           </form>
         </Form>
       </SheetContent>
+      <AttachmentPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        files={attachmentOptions}
+        invoices={invoiceOptions}
+        selected={selectedAttachments}
+        onChange={setSelectedAttachments}
+      />
     </Sheet>
   );
 }

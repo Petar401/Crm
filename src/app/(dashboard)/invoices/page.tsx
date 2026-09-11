@@ -79,6 +79,7 @@ export default async function InvoicesPage({
           invoices={invoices}
           canUpload={allowed.has("invoices.upload")}
           canDelete={allowed.has("invoices.delete")}
+          canEmail={allowed.has("email.send")}
         />
       </div>
     </div>

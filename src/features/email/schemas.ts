@@ -104,6 +104,8 @@ export const composeEmailSchema = z.object({
   contactId: optionalId,
   companyId: optionalId,
   dealId: optionalId,
+  attachmentIds: z.array(z.string().uuid()).max(10).optional(),
+  invoiceIds: z.array(z.string().uuid()).max(10).optional(),
 });
 
 export type ComposeEmailInput = z.infer<typeof composeEmailSchema>;

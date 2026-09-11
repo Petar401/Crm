@@ -81,6 +81,7 @@ export default async function FilesPage({
           files={files}
           canUpload={allowed.has("files.upload")}
           canDelete={allowed.has("files.delete")}
+          canEmail={allowed.has("email.send")}
         />
       </div>
 
@@ -93,6 +94,7 @@ export default async function FilesPage({
           <FilesGallery
             attachments={recordAttachments}
             canDelete={allowed.has("files.delete")}
+            canEmail={allowed.has("email.send")}
           />
         </div>
       )}

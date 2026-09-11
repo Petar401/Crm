@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Upload,
+  Camera,
   Trash2,
   FileText,
   Download,
   Eye,
+  Send,
   Folder as FolderIcon,
   FolderPlus,
   ChevronRight,
@@ -70,6 +72,7 @@ interface InvoicesManagerProps {
   invoices: InvoiceWithUrl[];
   canUpload: boolean;
   canDelete: boolean;
+  canEmail: boolean;
 }
 
 interface MetaState {
@@ -185,9 +188,11 @@ export function InvoicesManager({
   invoices,
   canUpload,
   canDelete,
+  canEmail,
 }: InvoicesManagerProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -223,6 +228,7 @@ export function InvoicesManager({
     setUploadMeta(emptyMeta);
     if (file) setUploadOpen(true);
     if (inputRef.current) inputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   }
 
   async function onUpload() {
@@ -381,6 +387,23 @@ export function InvoicesManager({
               className="hidden"
               onChange={onPickFile}
             />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={onPickFile}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={uploading}
+              onClick={() => cameraInputRef.current?.click()}
+            >
+              <Camera className="size-4" />
+              Take photo
+            </Button>
             <Button
               size="sm"
               disabled={uploading}
@@ -533,6 +556,16 @@ export function InvoicesManager({
                         >
                           <Download className="size-3.5" />
                         </a>
+                      </Button>
+                    )}
+                    {canEmail && (
+                      <Button size="icon" variant="ghost" className="size-7" asChild>
+                        <Link
+                          href={`/email?attach=${invoice.id}&type=invoice`}
+                          aria-label="Send via email"
+                        >
+                          <Send className="size-3.5" />
+                        </Link>
                       </Button>
                     )}
                     {canUpload && (

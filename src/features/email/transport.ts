@@ -22,6 +22,12 @@ export interface EmailCredentials {
   password: string;
 }
 
+export interface OutgoingAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 export interface OutgoingMessage {
   to: string[];
   cc?: string[];
@@ -29,6 +35,7 @@ export interface OutgoingMessage {
   subject: string;
   text: string;
   html?: string;
+  attachments?: OutgoingAttachment[];
 }
 
 export interface InboxMessage {
@@ -102,6 +109,7 @@ export async function sendMail(
     subject: message.subject,
     text: message.text,
     html: message.html,
+    attachments: message.attachments,
   });
   return { messageId: info.messageId ?? null };
 }

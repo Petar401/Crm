@@ -9,6 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import type { Email } from "@/lib/db/types";
 import type { ContactEmailOption } from "@/features/email/queries";
+import type { AttachmentWithUrl } from "@/features/attachments/queries";
+import type { InvoiceWithUrl } from "@/features/invoices/queries";
+import type { PickedAttachment } from "@/features/email/components/attachment-picker";
 import { MailboxList, type MailRow } from "./mailbox-list";
 import { MessageView, type DisplayMessage } from "./message-view";
 import { ComposeSheet } from "./compose-sheet";
@@ -35,6 +38,9 @@ interface Props {
   sentEmails: Email[];
   contactOptions: ContactEmailOption[];
   companyOptions: { id: string; name: string }[];
+  attachmentOptions?: AttachmentWithUrl[];
+  invoiceOptions?: InvoiceWithUrl[];
+  initialAttachments?: PickedAttachment[];
 }
 
 export function EmailTabs({
@@ -42,8 +48,13 @@ export function EmailTabs({
   sentEmails,
   contactOptions,
   companyOptions,
+  attachmentOptions = [],
+  invoiceOptions = [],
+  initialAttachments = [],
 }: Props) {
-  const [composeOpen, setComposeOpen] = useState(false);
+  // A "Send via email" deep link (?attach=<id>&type=file|invoice) should open
+  // Compose immediately with that document already attached.
+  const [composeOpen, setComposeOpen] = useState(initialAttachments.length > 0);
   const [selected, setSelected] = useState<DisplayMessage | null>(null);
   const [inbox, setInbox] = useState<InboxState>({ status: "loading" });
 
@@ -211,6 +222,9 @@ export function EmailTabs({
           onOpenChange={setComposeOpen}
           contactOptions={contactOptions}
           companyOptions={companyOptions}
+          attachmentOptions={attachmentOptions}
+          invoiceOptions={invoiceOptions}
+          initialAttachments={initialAttachments}
         />
       )}
     </div>
