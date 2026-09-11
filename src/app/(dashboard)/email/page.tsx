@@ -5,6 +5,7 @@ import { getPermissionSet } from "@/lib/auth/permissions";
 import { getSentEmails, getContactEmailOptions } from "@/features/email/queries";
 import { getCompanyOptions } from "@/features/contacts/queries";
 import { isEmailConfigured } from "@/features/email/settings-queries";
+import { isAiConfigured } from "@/features/ai/settings-queries";
 import {
   getAllAttachments,
   getAttachmentsByIds,
@@ -43,6 +44,7 @@ export default async function EmailPage({
 
   const canAttachFiles = allowed.has("files.view");
   const canAttachInvoices = allowed.has("invoices.view");
+  const aiEnabled = (await isAiConfigured(ctx.workspace.id)) && allowed.has("ai.use");
 
   const [sentEmails, contactOptions, companyOptions, attachmentOptions, invoiceOptions] =
     await Promise.all([
@@ -82,6 +84,7 @@ export default async function EmailPage({
         attachmentOptions={attachmentOptions}
         invoiceOptions={invoiceOptions}
         initialAttachments={initialAttachments}
+        aiEnabled={aiEnabled}
       />
     </div>
   );

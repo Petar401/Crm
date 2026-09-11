@@ -181,6 +181,145 @@ export async function draftLeadEmail(leadId: string): Promise<AiResult> {
   }
 }
 
+export interface EmailDraftResult {
+  subject?: string;
+  text?: string;
+  error?: string;
+}
+
+/** Splits a "Subject: ...\n\n<body>" completion into its parts. */
+function splitSubjectAndBody(raw: string): { subject?: string; text: string } {
+  const match = raw.match(/^Subject:\s*(.+)\r?\n+([\s\S]*)$/i);
+  if (match) return { subject: match[1].trim(), text: match[2].trim() };
+  return { text: raw.trim() };
+}
+
+export async function draftEmailFromPrompt(
+  instruction: string,
+  opts?: { contactId?: string; companyId?: string; dealId?: string }
+): Promise<EmailDraftResult> {
+  const auth = await authorizeAi();
+  if (!auth.ok) return { error: auth.error };
+  if (!instruction.trim()) return { error: "Describe what the email should say." };
+
+  const supabase = await createClient();
+  const contextLines: string[] = [];
+
+  if (opts?.contactId) {
+    const { data: contact } = await supabase
+      .from("contacts")
+      .select("full_name, job_title")
+      .eq("id", opts.contactId)
+      .eq("workspace_id", auth.ws)
+      .maybeSingle<{ full_name: string; job_title: string | null }>();
+    if (contact) {
+      contextLines.push(
+        `Contact: ${contact.full_name}${contact.job_title ? ` (${contact.job_title})` : ""}`
+      );
+    }
+  }
+  if (opts?.companyId) {
+    const { data: company } = await supabase
+      .from("companies")
+      .select("name, industry")
+      .eq("id", opts.companyId)
+      .eq("workspace_id", auth.ws)
+      .maybeSingle<{ name: string; industry: string | null }>();
+    if (company) {
+      contextLines.push(
+        `Company: ${company.name}${company.industry ? ` (${company.industry})` : ""}`
+      );
+    }
+  }
+  if (opts?.dealId) {
+    const { data: deal } = await supabase
+      .from("deals")
+      .select("name, value, currency, status, next_step")
+      .eq("id", opts.dealId)
+      .eq("workspace_id", auth.ws)
+      .maybeSingle<Deal>();
+    if (deal) {
+      contextLines.push(
+        `Deal: ${deal.name}, value ${deal.value ?? "unknown"} ${deal.currency}, status ${deal.status}` +
+          (deal.next_step ? `, next step: ${deal.next_step}` : "")
+      );
+    }
+  }
+
+  try {
+    const raw = await generateText(
+      `Draft an email based on this instruction: "${instruction}".` +
+        (contextLines.length ? `\n\nContext:\n${contextLines.join("\n")}` : "") +
+        `\n\nReply with exactly: the first line "Subject: <subject>", a blank line, ` +
+        `then only the email body — no other commentary.`,
+      SYSTEM,
+      auth.credentials
+    );
+    return splitSubjectAndBody(raw);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "AI request failed." };
+  }
+}
+
+export interface EmailReplyContext {
+  fromEmail?: string;
+  originalSubject?: string;
+  originalText?: string | null;
+}
+
+// No DB read here: inbound messages are fetched live over IMAP and have no
+// durable row, so all context is whatever the caller already has on screen
+// (works the same for replying to a sent email, whose context comes from the
+// already-loaded `emails` row).
+export async function draftEmailReply(
+  context: EmailReplyContext,
+  instruction: string
+): Promise<AiResult> {
+  const auth = await authorizeAi();
+  if (!auth.ok) return { error: auth.error };
+  if (!instruction.trim()) return { error: "Describe how you'd like to reply." };
+
+  try {
+    const text = await generateText(
+      `Draft a reply to the email below, following this instruction: "${instruction}". ` +
+        `Keep it under 150 words. Write only the reply body — no subject line, no quoted text.\n\n` +
+        `From: ${context.fromEmail ?? "unknown"}\n` +
+        `Subject: ${context.originalSubject ?? "(no subject)"}\n` +
+        `Message:\n${(context.originalText ?? "").slice(0, 4000)}`,
+      SYSTEM,
+      auth.credentials
+    );
+    return { text };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "AI request failed." };
+  }
+}
+
+// Pure text-in/text-out, no DB round-trip — used to revise whatever is
+// currently typed in a compose draft.
+export async function reviseEmailText(
+  currentText: string,
+  instruction: string
+): Promise<AiResult> {
+  const auth = await authorizeAi();
+  if (!auth.ok) return { error: auth.error };
+  if (!currentText.trim()) return { error: "Write a draft first." };
+  if (!instruction.trim()) return { error: "Describe the change you'd like." };
+
+  try {
+    const text = await generateText(
+      `Revise the email draft below according to this instruction: "${instruction}". ` +
+        `Keep the same intent and any names/facts/figures unchanged. ` +
+        `Return only the revised body text, nothing else.\n\n${currentText}`,
+      SYSTEM,
+      auth.credentials
+    );
+    return { text };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "AI request failed." };
+  }
+}
+
 export async function companyBrief(companyId: string): Promise<AiResult> {
   const auth = await authorizeAi();
   if (!auth.ok) return { error: auth.error };
