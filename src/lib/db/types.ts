@@ -453,6 +453,13 @@ export interface WorkspaceEmailSettings {
 export type EmailDirection = "outbound" | "inbound";
 export type EmailStatus = "sent" | "failed";
 
+/** A snapshot of one file attached to a sent email (see 0030_email_attachments.sql). */
+export interface EmailAttachment {
+  file_name: string;
+  storage_bucket: string;
+  storage_path: string;
+}
+
 /** A message sent from the CRM (durable send log — see 0025_email.sql). */
 export interface Email {
   id: string;
@@ -474,6 +481,7 @@ export interface Email {
   deal_id: string | null;
   created_by: string | null;
   sent_at: string | null;
+  attachments: EmailAttachment[];
   created_at: string;
 }
 

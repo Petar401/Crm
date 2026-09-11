@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Upload,
+  Camera,
   Trash2,
   FileText,
   Download,
   Eye,
+  Send,
   Folder as FolderIcon,
   FolderPlus,
   ChevronRight,
@@ -64,6 +66,7 @@ interface FilesManagerProps {
   files: AttachmentWithUrl[];
   canUpload: boolean;
   canDelete: boolean;
+  canEmail: boolean;
 }
 
 function formatSize(bytes: number | null): string {
@@ -85,9 +88,11 @@ export function FilesManager({
   files,
   canUpload,
   canDelete,
+  canEmail,
 }: FilesManagerProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -106,9 +111,7 @@ export function FilesManager({
     });
   }
 
-  async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function uploadFile(file: File) {
     setUploading(true);
     try {
       const supabase = createClient();
@@ -145,7 +148,14 @@ export function FilesManager({
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
     }
+  }
+
+  async function onFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadFile(file);
   }
 
   function onCreateFolder() {
@@ -248,6 +258,23 @@ export function FilesManager({
               className="hidden"
               onChange={onFileSelected}
             />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={onFileSelected}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={uploading}
+              onClick={() => cameraInputRef.current?.click()}
+            >
+              <Camera className="size-4" />
+              Take photo
+            </Button>
             <Button
               size="sm"
               disabled={uploading}
@@ -385,6 +412,16 @@ export function FilesManager({
                       >
                         <Download className="size-3.5" />
                       </a>
+                    </Button>
+                  )}
+                  {canEmail && (
+                    <Button size="icon" variant="ghost" className="size-7" asChild>
+                      <Link
+                        href={`/email?attach=${file.id}&type=file`}
+                        aria-label="Send via email"
+                      >
+                        <Send className="size-3.5" />
+                      </Link>
                     </Button>
                   )}
                   {canDelete && (

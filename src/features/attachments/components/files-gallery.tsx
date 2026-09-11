@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Download, Trash2, Eye } from "lucide-react";
+import { FileText, Download, Trash2, Eye, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import type { AttachmentWithUrl } from "@/features/attachments/queries";
@@ -34,9 +35,11 @@ const ENTITY_HREF: Record<string, (id: string) => string | null> = {
 export function FilesGallery({
   attachments,
   canDelete,
+  canEmail,
 }: {
   attachments: AttachmentWithUrl[];
   canDelete: boolean;
+  canEmail: boolean;
 }) {
   const router = useRouter();
   const [viewerFile, setViewerFile] = useState<ViewableFile | null>(null);
@@ -133,6 +136,16 @@ export function FilesGallery({
                     >
                       <Download className="size-3.5" />
                     </a>
+                  </Button>
+                )}
+                {canEmail && (
+                  <Button size="icon" variant="ghost" className="size-7" asChild>
+                    <Link
+                      href={`/email?attach=${file.id}&type=file`}
+                      aria-label="Send via email"
+                    >
+                      <Send className="size-3.5" />
+                    </Link>
                   </Button>
                 )}
                 {canDelete && (

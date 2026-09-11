@@ -68,3 +68,33 @@ export async function getInvoices(
     .limit(LIST_LIMIT);
   return withSignedUrls(supabase, (data ?? []) as Invoice[]);
 }
+
+/** All invoices in a workspace, newest first (used by the email attachment picker). */
+export async function getAllInvoices(
+  workspaceId: string
+): Promise<InvoiceWithUrl[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
+  return withSignedUrls(supabase, (data ?? []) as Invoice[]);
+}
+
+/** Invoice records for the given ids within a workspace (no signed URLs). */
+export async function getInvoicesByIds(
+  workspaceId: string,
+  ids: string[]
+): Promise<Invoice[]> {
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .in("id", ids);
+
+  return (data ?? []) as Invoice[];
+}
