@@ -16,6 +16,7 @@ import {
   AttachmentPicker,
   type PickedAttachment,
 } from "@/features/email/components/attachment-picker";
+import { AiComposeAssistant } from "@/features/email/components/ai-compose-assistant";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,8 +52,14 @@ interface Props {
   companyOptions: { id: string; name: string }[];
   attachmentOptions?: AttachmentWithUrl[];
   invoiceOptions?: InvoiceWithUrl[];
-  replyTo?: { to?: string; subject?: string };
+  replyTo?: {
+    to?: string;
+    subject?: string;
+    quotedText?: string | null;
+    originalFrom?: string;
+  };
   initialAttachments?: PickedAttachment[];
+  aiEnabled?: boolean;
 }
 
 const NONE = "__none__";
@@ -66,6 +73,7 @@ export function ComposeSheet({
   invoiceOptions = [],
   replyTo,
   initialAttachments = [],
+  aiEnabled = false,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -87,13 +95,33 @@ export function ComposeSheet({
     },
   });
 
-  // Sync the pre-selected attachment (from a "Send via email" deep link) when
-  // the sheet transitions to open for a new message. Adjusted during render
-  // (not an effect) per React's guidance for resetting state on prop change.
+  const quoteBlock = replyTo?.quotedText
+    ? `\n\n${replyTo.originalFrom ? `On ${replyTo.originalFrom} wrote:` : "Wrote:"}\n${replyTo.quotedText
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n")}`
+    : "";
+
+  // Sync the pre-selected attachment (from a "Send via email" deep link) and
+  // the reply prefill (to/subject/quoted body) when the sheet transitions to
+  // open for a new message. Adjusted during render (not an effect) per
+  // React's guidance for resetting state on prop change.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setSelectedAttachments(initialAttachments);
+    if (open) {
+      setSelectedAttachments(initialAttachments);
+      form.reset({
+        to: replyTo?.to ?? "",
+        cc: "",
+        bcc: "",
+        subject: replyTo?.subject ?? "",
+        body: quoteBlock,
+        contactId: "",
+        companyId: "",
+        dealId: "",
+      });
+    }
   }
 
   function removeAttachment(item: PickedAttachment) {
@@ -254,6 +282,21 @@ export function ComposeSheet({
                   <FormMessage />
                 </FormItem>
               )}
+            />
+            <AiComposeAssistant
+              form={form}
+              aiEnabled={aiEnabled}
+              mode={replyTo?.quotedText ? "reply" : "new"}
+              replyContext={
+                replyTo?.quotedText
+                  ? {
+                      fromEmail: replyTo.to,
+                      originalSubject: replyTo.subject,
+                      originalText: replyTo.quotedText,
+                    }
+                  : undefined
+              }
+              quoteBlock={quoteBlock}
             />
             <FormField
               control={form.control}

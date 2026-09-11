@@ -33,6 +33,13 @@ type InboxState =
   | { status: "error"; error: string }
   | { status: "ready"; messages: InboxMessageDTO[] };
 
+interface ComposeReplyContext {
+  to: string;
+  subject: string;
+  quotedText: string | null;
+  originalFrom: string;
+}
+
 interface Props {
   canSend: boolean;
   sentEmails: Email[];
@@ -41,6 +48,11 @@ interface Props {
   attachmentOptions?: AttachmentWithUrl[];
   invoiceOptions?: InvoiceWithUrl[];
   initialAttachments?: PickedAttachment[];
+  aiEnabled?: boolean;
+}
+
+function replySubject(subject: string): string {
+  return /^re:/i.test(subject) ? subject : `Re: ${subject}`;
 }
 
 export function EmailTabs({
@@ -51,11 +63,13 @@ export function EmailTabs({
   attachmentOptions = [],
   invoiceOptions = [],
   initialAttachments = [],
+  aiEnabled = false,
 }: Props) {
   // A "Send via email" deep link (?attach=<id>&type=file|invoice) should open
   // Compose immediately with that document already attached.
   const [composeOpen, setComposeOpen] = useState(initialAttachments.length > 0);
   const [selected, setSelected] = useState<DisplayMessage | null>(null);
+  const [composeReply, setComposeReply] = useState<ComposeReplyContext | null>(null);
   const [inbox, setInbox] = useState<InboxState>({ status: "loading" });
 
   // Kept free of any synchronous setState so it is safe to call from an effect.
@@ -114,6 +128,7 @@ export function EmailTabs({
       date: m.date,
       text: m.text,
       html: m.html,
+      replyTo: { to: m.from, subject: replySubject(m.subject) },
     });
   }
 
@@ -129,14 +144,34 @@ export function EmailTabs({
       html: e.body_html,
       status: e.status,
       error: e.error,
+      replyTo: {
+        to: e.to_emails.join(", "),
+        subject: replySubject(e.subject ?? ""),
+      },
     });
+  }
+
+  function handleReply(message: DisplayMessage) {
+    setSelected(null);
+    setComposeReply({
+      to: message.replyTo.to,
+      subject: message.replyTo.subject,
+      quotedText: message.text,
+      originalFrom: message.from,
+    });
+    setComposeOpen(true);
+  }
+
+  function openCompose() {
+    setComposeReply(null);
+    setComposeOpen(true);
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end">
         {canSend && (
-          <Button onClick={() => setComposeOpen(true)}>
+          <Button onClick={openCompose}>
             <PenSquare className="size-4" />
             Compose
           </Button>
@@ -204,7 +239,7 @@ export function EmailTabs({
               description="Messages you send from the CRM will appear here."
               action={
                 canSend ? (
-                  <Button size="sm" onClick={() => setComposeOpen(true)}>
+                  <Button size="sm" onClick={openCompose}>
                     Compose
                   </Button>
                 ) : undefined
@@ -214,7 +249,12 @@ export function EmailTabs({
         </TabsContent>
       </Tabs>
 
-      <MessageView message={selected} onOpenChange={(o) => !o && setSelected(null)} />
+      <MessageView
+        message={selected}
+        onOpenChange={(o) => !o && setSelected(null)}
+        onReply={handleReply}
+        canReply={canSend}
+      />
 
       {canSend && (
         <ComposeSheet
@@ -225,6 +265,8 @@ export function EmailTabs({
           attachmentOptions={attachmentOptions}
           invoiceOptions={invoiceOptions}
           initialAttachments={initialAttachments}
+          replyTo={composeReply ?? undefined}
+          aiEnabled={aiEnabled}
         />
       )}
     </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { Reply } from "lucide-react";
+
 import {
   Sheet,
   SheetContent,
@@ -7,6 +9,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export interface DisplayMessage {
   subject: string;
@@ -17,23 +20,39 @@ export interface DisplayMessage {
   html: string | null;
   status?: "sent" | "failed";
   error?: string | null;
+  replyTo: { to: string; subject: string };
 }
 
 interface Props {
   message: DisplayMessage | null;
   onOpenChange: (open: boolean) => void;
+  onReply: (message: DisplayMessage) => void;
+  canReply: boolean;
 }
 
-export function MessageView({ message, onOpenChange }: Props) {
+export function MessageView({ message, onOpenChange, onReply, canReply }: Props) {
   return (
     <Sheet open={!!message} onOpenChange={onOpenChange}>
       <SheetContent className="overflow-y-auto sm:max-w-xl">
         {message && (
           <>
             <SheetHeader>
-              <SheetTitle className="pr-6 text-base leading-snug">
-                {message.subject || "(no subject)"}
-              </SheetTitle>
+              <div className="flex items-start justify-between gap-2 pr-6">
+                <SheetTitle className="text-base leading-snug">
+                  {message.subject || "(no subject)"}
+                </SheetTitle>
+                {canReply && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => onReply(message)}
+                  >
+                    <Reply className="size-4" />
+                    Reply
+                  </Button>
+                )}
+              </div>
             </SheetHeader>
             <div className="space-y-4 px-4 pb-6">
               <div className="text-muted-foreground space-y-1 border-b pb-3 text-sm">
