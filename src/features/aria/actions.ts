@@ -7,8 +7,6 @@ import { extractTextFromFile } from "@/features/ai/extract-text";
 import { runAriaChat } from "@/features/aria/ai-chat";
 import type { GeminiHistoryItem, ChatPart } from "@/features/aria/ai-chat";
 import { getCrmContext } from "@/features/aria/queries";
-import { getAttachmentsByIds } from "@/features/attachments/queries";
-import { ATTACHMENT_BUCKET } from "@/features/attachments/constants";
 import { createClient } from "@/lib/supabase/server";
 
 export interface HistoryMessage {
@@ -99,23 +97,31 @@ export async function sendAriaMessage(
     }
   }
 
-  // Files picked from the workspace Files section — download and read server-side.
+  // Files picked from the workspace Files/Invoices section — download and read
+  // server-side. Resolved against the same crm.files map read_workspace_file
+  // uses, since the picker now offers both attachments and invoices.
   if (workspaceFileIds?.length) {
-    const records = await getAttachmentsByIds(ctx.workspace.id, workspaceFileIds);
     const supabase = await createClient();
-    for (const rec of records) {
+    for (const id of workspaceFileIds) {
+      const ref = crm.files.get(id);
+      if (!ref) {
+        newParts.push({
+          text: `\n\n[Could not find a file or invoice with id "${id}".]`,
+        });
+        continue;
+      }
       const { data, error } = await supabase.storage
-        .from(ATTACHMENT_BUCKET)
-        .download(rec.storage_path);
+        .from(ref.storage_bucket)
+        .download(ref.storage_path);
       if (error || !data) {
         newParts.push({
-          text: `\n\n[Could not read "${rec.file_name}" from the Files section.]`,
+          text: `\n\n[Could not read "${ref.file_name}" from the Files section.]`,
         });
         continue;
       }
       const bytes = new Uint8Array(await data.arrayBuffer());
       newParts.push(
-        await fileToPart(bytes, rec.mime_type ?? "", rec.file_name)
+        await fileToPart(bytes, ref.mime_type ?? "", ref.file_name)
       );
     }
   }
@@ -160,9 +166,10 @@ export interface WorkspaceFileOption {
   name: string;
   mimeType: string | null;
   size: number | null;
+  source: "attachment" | "invoice";
 }
 
-/** Lists the workspace's uploaded files for the Aria file picker. */
+/** Lists the workspace's uploaded files and invoices for the Aria file picker. */
 export async function listWorkspaceFilesForAria(): Promise<
   WorkspaceFileOption[]
 > {
@@ -170,16 +177,35 @@ export async function listWorkspaceFilesForAria(): Promise<
   await requirePermission("ai.use");
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("attachments")
-    .select("id, file_name, mime_type, file_size")
-    .eq("workspace_id", ctx.workspace.id)
-    .order("created_at", { ascending: false });
+  const [{ data: attachmentData }, { data: invoiceData }] = await Promise.all([
+    supabase
+      .from("attachments")
+      .select("id, file_name, mime_type, file_size")
+      .eq("workspace_id", ctx.workspace.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("invoices")
+      .select("id, file_name, mime_type, file_size")
+      .eq("workspace_id", ctx.workspace.id)
+      .order("created_at", { ascending: false }),
+  ]);
 
-  return (data ?? []).map((a) => ({
-    id: a.id as string,
-    name: a.file_name as string,
-    mimeType: (a.mime_type as string | null) ?? null,
-    size: (a.file_size as number | null) ?? null,
+  const attachmentOptions: WorkspaceFileOption[] = (attachmentData ?? []).map(
+    (a) => ({
+      id: a.id as string,
+      name: a.file_name as string,
+      mimeType: (a.mime_type as string | null) ?? null,
+      size: (a.file_size as number | null) ?? null,
+      source: "attachment",
+    })
+  );
+  const invoiceOptions: WorkspaceFileOption[] = (invoiceData ?? []).map((i) => ({
+    id: i.id as string,
+    name: i.file_name as string,
+    mimeType: (i.mime_type as string | null) ?? null,
+    size: (i.file_size as number | null) ?? null,
+    source: "invoice",
   }));
+
+  return [...attachmentOptions, ...invoiceOptions];
 }
