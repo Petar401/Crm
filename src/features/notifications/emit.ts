@@ -32,9 +32,23 @@ export async function notify(params: NotifyParams): Promise<void> {
 
     const client = params.useAdmin ? createAdminClient() : await createClient();
 
+    // Only members of the workspace may receive its notifications. Recipient
+    // ids often come from client input (task assignee, record owner), so drop
+    // anyone who isn't a member rather than trusting the caller.
+    const { data: members } = await client
+      .from("workspace_members")
+      .select("user_id")
+      .eq("workspace_id", params.workspaceId)
+      .in("user_id", unique);
+    const memberIds = new Set(
+      ((members ?? []) as { user_id: string }[]).map((m) => m.user_id)
+    );
+    const recipients = unique.filter((id) => memberIds.has(id));
+    if (recipients.length === 0) return;
+
     // TODO: email digest support — read notification_preferences.email and
     // enqueue for delivery. Ships silently now while the transport is missing.
-    const rows = unique.map((userId) => ({
+    const rows = recipients.map((userId) => ({
       workspace_id: params.workspaceId,
       user_id: userId,
       kind: params.kind,

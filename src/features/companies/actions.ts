@@ -7,6 +7,7 @@ import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
 import { companySchema, companyStatuses } from "@/features/companies/schemas";
+import { isWorkspaceMember } from "@/features/team/queries";
 
 export interface ActionResult {
   error?: string;
@@ -113,6 +114,10 @@ export async function reassignCompany(
 ): Promise<ActionResult> {
   const ctx = await requireAuthContext();
   await requirePermission("companies.update");
+
+  if (ownerUserId && !(await isWorkspaceMember(ctx.workspace.id, ownerUserId))) {
+    return { error: "The new owner must be a member of this workspace." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase

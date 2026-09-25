@@ -91,7 +91,13 @@ export default async function SettingsPage() {
       <PageHeader
         title="Settings"
         description="Manage your workspace and team"
-        action={canInvite ? <InviteMemberDialog /> : undefined}
+        action={
+          canInvite ? (
+            <InviteMemberDialog
+              canGrantFullAccess={allowed.has("team.edit_roles")}
+            />
+          ) : undefined
+        }
       />
 
       <div className="space-y-6">

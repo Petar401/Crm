@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
@@ -72,8 +72,8 @@ export function CampaignForm({
     },
   });
 
-  const frequency = form.watch("frequency");
-  const source = form.watch("source");
+  const frequency = useWatch({ control: form.control, name: "frequency" });
+  const source = useWatch({ control: form.control, name: "source" });
   const isApollo = source === "apollo";
 
   function onSubmit(values: CampaignInput) {

@@ -1,0 +1,81 @@
+-- 0032_permission_catalog_backfill.sql
+-- Makes the permission catalog complete from migrations alone.
+--
+-- Several keys (invoices.*, products.*, quotes.*, billing.*, calendar.*,
+-- scheduling.*, ...) were only ever inserted by supabase/seed.sql. The
+-- role_permissions / member_permission_overrides foreign keys reference
+-- public.permissions, so on a database where the seed was skipped (or run
+-- before a later migration) granting one of those keys to a custom role
+-- failed. This inserts every key the app knows about.
+--
+-- Additive and idempotent: existing rows (and their descriptions) are left
+-- untouched, so it is safe to run whether or not seed.sql was applied.
+
+insert into public.permissions (key, description) values
+  ('companies.view',   'View companies'),
+  ('companies.create', 'Create companies'),
+  ('companies.update', 'Edit companies'),
+  ('companies.delete', 'Delete companies'),
+  ('contacts.view',    'View contacts'),
+  ('contacts.create',  'Create contacts'),
+  ('contacts.update',  'Edit contacts'),
+  ('contacts.delete',  'Delete contacts'),
+  ('deals.view',       'View deals'),
+  ('deals.create',     'Create deals'),
+  ('deals.update',     'Edit deals'),
+  ('deals.delete',     'Delete deals'),
+  ('tasks.view',       'View tasks'),
+  ('tasks.create',     'Create tasks'),
+  ('tasks.update',     'Edit tasks'),
+  ('tasks.delete',     'Delete tasks'),
+  ('notes.view',       'View notes'),
+  ('notes.create',     'Create notes'),
+  ('notes.update',     'Edit notes'),
+  ('notes.delete',     'Delete notes'),
+  ('notebook.view',    'View shared notes'),
+  ('notebook.create',  'Create shared notes & folders'),
+  ('notebook.update',  'Edit shared notes & folders'),
+  ('notebook.delete',  'Delete shared notes & folders'),
+  ('files.view',       'View files'),
+  ('files.upload',     'Upload files'),
+  ('files.delete',     'Delete files'),
+  ('invoices.view',    'View invoices & receipts'),
+  ('invoices.upload',  'Upload invoices & manage folders'),
+  ('invoices.delete',  'Delete invoices & folders'),
+  ('team.view',        'View team members'),
+  ('team.invite',      'Invite team members'),
+  ('team.edit_roles',  'Edit roles & permissions'),
+  ('settings.view',    'View settings'),
+  ('settings.update',  'Update settings'),
+  ('ai.use',           'Use AI actions'),
+  ('leads.view',       'View lead campaigns & discovered leads'),
+  ('leads.create',     'Create campaigns & run lead discovery'),
+  ('leads.update',     'Edit campaigns & review/approve leads'),
+  ('leads.delete',     'Delete campaigns & leads'),
+  ('leads.import',     'Import leads & enrich via Apollo.io (uses paid credits)'),
+  ('email.view',       'View the mailbox & sent email'),
+  ('email.send',       'Compose & send email'),
+  ('notifications.view', 'View your notifications'),
+  ('audit.view',       'View the workspace audit log'),
+  ('settings.tokens',  'Create and revoke personal API tokens'),
+  ('products.view',    'View products, price books & tax rates'),
+  ('products.create',  'Create products & pricing'),
+  ('products.update',  'Edit products & pricing'),
+  ('products.delete',  'Delete products & pricing'),
+  ('quotes.view',      'View quotes'),
+  ('quotes.create',    'Create quotes'),
+  ('quotes.update',    'Edit quotes'),
+  ('quotes.delete',    'Delete quotes'),
+  ('quotes.send',      'Send quotes & share links'),
+  ('billing.view',     'View billing invoices & payments'),
+  ('billing.create',   'Create billing invoices'),
+  ('billing.update',   'Edit billing invoices'),
+  ('billing.delete',   'Void or delete billing invoices'),
+  ('billing.send',     'Send billing invoices & take payment'),
+  ('calendar.view',    'View the calendar & events'),
+  ('calendar.create',  'Create calendar events'),
+  ('calendar.update',  'Edit calendar events'),
+  ('calendar.delete',  'Delete calendar events'),
+  ('scheduling.view',  'View public booking links'),
+  ('scheduling.manage','Create & manage public booking links')
+on conflict (key) do nothing;

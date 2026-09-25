@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
@@ -76,7 +76,7 @@ export function ProductForm({
     },
   });
 
-  const kind = form.watch("kind");
+  const kind = useWatch({ control: form.control, name: "kind" });
 
   function onSubmit(values: ProductInput) {
     startTransition(async () => {

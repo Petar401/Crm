@@ -50,3 +50,22 @@ export async function getMemberOptions(
     name: m.profile?.full_name || m.profile?.email || "Unknown",
   }));
 }
+
+/**
+ * Whether `userId` belongs to the workspace. Used to validate user-id fields
+ * that arrive from the client (task assignee, record owner) so a caller can't
+ * point a record, or the notification it triggers, at an arbitrary user.
+ */
+export async function isWorkspaceMember(
+  workspaceId: string,
+  userId: string
+): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .maybeSingle<{ user_id: string }>();
+  return Boolean(data);
+}

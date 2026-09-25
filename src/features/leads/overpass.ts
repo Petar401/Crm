@@ -42,9 +42,28 @@ interface OverpassElement {
   tags?: Record<string, string>;
 }
 
-/** Escape a user-supplied string for safe use inside an Overpass regex. */
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Reduce a user-supplied category to a safe fragment for a double-quoted
+ * Overpass regex literal. The value passes through two parsers (QL string
+ * unescaping, then the regex engine), so rather than escape for both, keep only
+ * characters that are literal in each: letters, digits, `_`, spaces and `-'&/`.
+ * Previously `"` was left in, so a category such as `x"](1,1,1,1);out;(` could
+ * break out of the literal and inject QL.
+ */
+export function escapeRegex(value: string): string {
+  return value
+    .replace(/[^\p{L}\p{N}_ \-'&/]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** A bbox is exactly four finite numbers, "south,west,north,east". */
+export function isValidBbox(bbox: string): boolean {
+  const parts = bbox.split(",");
+  return (
+    parts.length === 4 &&
+    parts.every((p) => /^[-0-9.]+$/.test(p) && Number.isFinite(Number(p)))
+  );
 }
 
 /** Geocode a free-text location to an Overpass bbox "south,west,north,east". */
@@ -68,12 +87,27 @@ export async function geocodeArea(
 
   // Nominatim returns [south, north, west, east]; Overpass wants S,W,N,E.
   const [south, north, west, east] = box;
-  return `${south},${west},${north},${east}`;
+  const bbox = `${south},${west},${north},${east}`;
+  // The bbox is interpolated into the QL query verbatim, so never trust it
+  // blindly even though it comes from Nominatim.
+  return isValidBbox(bbox) ? bbox : null;
 }
 
-/** Build an Overpass QL query for the given categories within a bbox. */
-function buildQuery(categories: string[], bbox: string, limit: number): string {
-  const regex = categories.map((c) => escapeRegex(c.trim())).join("|");
+/**
+ * Build an Overpass QL query for the given categories within a bbox. Returns
+ * null when no category survives sanitising — an empty pattern would match
+ * every named business in the area.
+ */
+export function buildQuery(
+  categories: string[],
+  bbox: string,
+  limit: number
+): string | null {
+  const regex = categories
+    .map((c) => escapeRegex(c))
+    .filter(Boolean)
+    .join("|");
+  if (!regex) return null;
   const statements = CATEGORY_KEYS.map(
     (key) => `  nwr["name"]["${key}"~"${regex}",i](${bbox});`
   );
@@ -118,6 +152,7 @@ export async function searchBusinesses(opts: {
   if (!bbox) return [];
 
   const query = buildQuery(categories, bbox, Math.min(opts.limit * 3, 150));
+  if (!query) return [];
   const res = await fetch(OVERPASS_URL, {
     method: "POST",
     headers: {

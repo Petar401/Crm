@@ -7,6 +7,10 @@ import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
 import { contactSchema } from "@/features/contacts/schemas";
+import {
+  findForeignReference,
+  foreignReferenceError,
+} from "@/lib/db/ownership";
 
 export interface ActionResult {
   error?: string;
@@ -23,6 +27,11 @@ export async function createContact(values: unknown): Promise<ActionResult> {
   await requirePermission("contacts.create");
 
   const supabase = await createClient();
+  const foreign = await findForeignReference(supabase, ctx.workspace.id, [
+    ["companies", parsed.data.company_id],
+  ]);
+  if (foreign) return { error: foreignReferenceError(foreign) };
+
   const { data, error } = await supabase
     .from("contacts")
     .insert({
@@ -62,6 +71,11 @@ export async function updateContact(
   await requirePermission("contacts.update");
 
   const supabase = await createClient();
+  const foreign = await findForeignReference(supabase, ctx.workspace.id, [
+    ["companies", parsed.data.company_id],
+  ]);
+  if (foreign) return { error: foreignReferenceError(foreign) };
+
   const { error } = await supabase
     .from("contacts")
     .update(parsed.data)

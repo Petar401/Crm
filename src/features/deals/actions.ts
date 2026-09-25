@@ -9,6 +9,10 @@ import { logActivity } from "@/features/activities/log";
 import { notify } from "@/features/notifications/emit";
 import { dealSchema } from "@/features/deals/schemas";
 import type { DealInput } from "@/features/deals/schemas";
+import {
+  findForeignReference,
+  foreignReferenceError,
+} from "@/lib/db/ownership";
 
 export interface ActionResult {
   error?: string;
@@ -49,6 +53,14 @@ export async function createDeal(values: unknown): Promise<ActionResult> {
   await requirePermission("deals.create");
 
   const supabase = await createClient();
+  const foreign = await findForeignReference(supabase, ctx.workspace.id, [
+    ["companies", parsed.data.company_id],
+    ["contacts", parsed.data.primary_contact_id],
+    ["deal_pipelines", parsed.data.pipeline_id],
+    ["deal_stages", parsed.data.stage_id],
+  ]);
+  if (foreign) return { error: foreignReferenceError(foreign) };
+
   const { data, error } = await supabase
     .from("deals")
     .insert({
@@ -88,6 +100,14 @@ export async function updateDeal(
   await requirePermission("deals.update");
 
   const supabase = await createClient();
+  const foreign = await findForeignReference(supabase, ctx.workspace.id, [
+    ["companies", parsed.data.company_id],
+    ["contacts", parsed.data.primary_contact_id],
+    ["deal_pipelines", parsed.data.pipeline_id],
+    ["deal_stages", parsed.data.stage_id],
+  ]);
+  if (foreign) return { error: foreignReferenceError(foreign) };
+
   const { error } = await supabase
     .from("deals")
     .update(toRow(parsed.data))
