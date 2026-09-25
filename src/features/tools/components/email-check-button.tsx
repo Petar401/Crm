@@ -23,37 +23,45 @@ const BADGE_VARIANT: Record<EmailDomainResult["status"], "default" | "destructiv
   unknown: "secondary",
 };
 
-/** Ghost "Check email" button that shows the result as a small badge. */
+/**
+ * Ghost "Check email" button; the result shows as a badge beside it. The
+ * result is tied to the address it was checked for, so editing the email
+ * clears it, and the button stays available to re-check (e.g. after an
+ * "unknown" DNS timeout).
+ */
 export function EmailCheckButton({ email }: { email: string | null }) {
-  const [result, setResult] = useState<EmailDomainResult | null>(null);
+  const [checked, setChecked] = useState<{
+    email: string;
+    result: EmailDomainResult;
+  } | null>(null);
   const [pending, startTransition] = useTransition();
 
   if (!email) return null;
   const target = email;
+  const result = checked?.email === target ? checked.result : null;
 
   function check() {
     startTransition(async () => {
-      setResult(await checkEmailDomainAction(target));
+      setChecked({ email: target, result: await checkEmailDomainAction(target) });
     });
   }
 
-  if (result) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Badge variant={BADGE_VARIANT[result.status]} title={result.message}>
-            {result.message}
-          </Badge>
-        </TooltipTrigger>
-        <TooltipContent>{result.message}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
   return (
-    <Button type="button" variant="ghost" size="sm" onClick={check} disabled={pending}>
-      <MailCheck className="size-4" />
-      {pending ? "Checking…" : "Check email"}
-    </Button>
+    <span className="inline-flex items-center gap-1.5">
+      {result && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge variant={BADGE_VARIANT[result.status]}>
+              {result.status === "ok" ? "Accepts email" : result.status === "unknown" ? "Unknown" : "No mail"}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>{result.message}</TooltipContent>
+        </Tooltip>
+      )}
+      <Button type="button" variant="ghost" size="sm" onClick={check} disabled={pending}>
+        <MailCheck className="size-4" />
+        {pending ? "Checking…" : result ? "Re-check" : "Check email"}
+      </Button>
+    </span>
   );
 }

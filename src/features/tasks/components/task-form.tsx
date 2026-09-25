@@ -10,7 +10,8 @@ import { taskSchema, type TaskInput } from "@/features/tasks/schemas";
 import { createTask, updateTask } from "@/features/tasks/actions";
 import type { MemberOption } from "@/features/team/queries";
 import type { Task } from "@/lib/db/types";
-import { bankHolidayOnClient, type BankHolidaySlim } from "@/lib/utils/bank-holidays";
+import { bankHolidayOn, type BankHolidaySlim } from "@/lib/utils/bank-holidays";
+import { toDateTimeLocalValue } from "@/lib/utils/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,7 +70,7 @@ export function TaskForm({
       description: task?.description ?? "",
       status: task?.status ?? "todo",
       priority: task?.priority ?? "medium",
-      due_at: task?.due_at ? task.due_at.slice(0, 16) : "",
+      due_at: task?.due_at ? toDateTimeLocalValue(task.due_at) : "",
       assigned_to: task?.assigned_to ?? "",
       company_id: task?.company_id ?? "",
       deal_id: task?.deal_id ?? "",
@@ -77,7 +78,7 @@ export function TaskForm({
   });
 
   const dueAt = useWatch({ control: form.control, name: "due_at" });
-  const dueHoliday = bankHolidayOnClient(bankHolidays, dueAt);
+  const dueHoliday = bankHolidayOn(bankHolidays, dueAt);
 
   function onSubmit(values: TaskInput) {
     const payload = {

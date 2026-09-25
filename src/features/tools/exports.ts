@@ -12,7 +12,7 @@ import { buildVCards, type VCardContact } from "@/lib/utils/vcard";
  * never contains more than the member could see in the UI.
  */
 
-/** Hard cap per export; pages of 1,000 (PostgREST's default max rows). */
+/** Hard cap per export, read in pages of up to 1,000 rows. */
 export const EXPORT_MAX_ROWS = 10_000;
 const PAGE_SIZE = 1_000;
 
@@ -152,7 +152,9 @@ async function fetchAll(
 ): Promise<Row[]> {
   const supabase = await createClient();
   const rows: Row[] = [];
-  for (let from = 0; from < EXPORT_MAX_ROWS; from += PAGE_SIZE) {
+  // Advance by the rows actually returned, so this is correct whatever the
+  // PostgREST max-rows setting is; stop on an empty page.
+  for (let from = 0; from < EXPORT_MAX_ROWS; ) {
     let query = supabase
       .from(table)
       .select(select)
@@ -172,8 +174,9 @@ async function fetchAll(
       .range(from, Math.min(from + PAGE_SIZE, EXPORT_MAX_ROWS) - 1);
     if (error) throw new Error(error.message);
     const page = (data ?? []) as unknown as Row[];
+    if (page.length === 0) break;
     rows.push(...page);
-    if (page.length < PAGE_SIZE) break;
+    from += page.length;
   }
   return rows;
 }

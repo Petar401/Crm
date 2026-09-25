@@ -144,7 +144,7 @@ export default async function LeadDetailPage({
                   <span className="text-muted-foreground">Email</span>
                   <div className="flex items-center gap-2">
                     <span className="truncate text-right">{lead.email}</span>
-                    <EmailCheckButton email={lead.contact_email ?? lead.email} />
+                    <EmailCheckButton email={lead.email} />
                   </div>
                 </div>
               )}
@@ -162,9 +162,7 @@ export default async function LeadDetailPage({
                       <p className="text-muted-foreground text-xs">
                         {lead.contact_email}
                       </p>
-                      {!lead.email && (
-                        <EmailCheckButton email={lead.contact_email} />
-                      )}
+                      <EmailCheckButton email={lead.contact_email} />
                     </div>
                   )}
                 </div>

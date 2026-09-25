@@ -120,8 +120,10 @@ export async function runFreeTool(
   name: string,
   rawArguments: string | undefined
 ): Promise<string | null> {
+  // Own properties only: a model-supplied name such as "constructor" or
+  // "toString" must not resolve to an Object.prototype function.
+  if (!Object.hasOwn(FREE_TOOL_HANDLERS, name)) return null;
   const handler = FREE_TOOL_HANDLERS[name];
-  if (!handler) return null;
   let args: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(rawArguments || "{}");

@@ -18,6 +18,14 @@ export const CSV_BOM = "﻿";
  */
 const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
 
+/**
+ * "+44 1603 123456", "-12.5", "(01603) 123-456": digits and phone
+ * punctuation only. A spreadsheet can't run anything from these, so they're
+ * exported as-is rather than with a guard apostrophe that would mangle
+ * international phone numbers.
+ */
+const PHONE_OR_NUMBER = /^[+-]?[\d\s().-]+$/;
+
 function cellText(value: unknown): string {
   if (value == null) return "";
   if (value instanceof Date) return value.toISOString();
@@ -28,12 +36,18 @@ function cellText(value: unknown): string {
 /** Escapes one cell: neutralises formulas, then quotes when needed. */
 export function csvCell(value: unknown): string {
   let text = cellText(value);
-  // Plain numbers (including negatives, e.g. "-12.5") are data, not formulas.
-  const isNumber = text.trim() !== "" && Number.isFinite(Number(text));
-  if (FORMULA_TRIGGER.test(text) && !isNumber) {
+  if (FORMULA_TRIGGER.test(text) && !PHONE_OR_NUMBER.test(text)) {
     text = `'${text}`;
   }
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/**
+ * Reverses the export guard: `'=SUM(A1)` → `=SUM(A1)`. Applied on import so a
+ * file exported from the CRM round-trips without gaining apostrophes.
+ */
+export function unguardCsvCell(value: string): string {
+  return /^'[=+\-@\t\r]/.test(value) ? value.slice(1) : value;
 }
 
 /** Serialises rows to CSV with a header line, CRLF line endings and a BOM. */
@@ -43,6 +57,20 @@ export function toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): 
     lines.push(columns.map((c) => csvCell(c.value(row))).join(","));
   }
   return CSV_BOM + lines.join("\r\n") + "\r\n";
+}
+
+/**
+ * Decodes an uploaded CSV file. UTF-8 (with or without BOM) is tried first;
+ * files that aren't valid UTF-8 are read as Windows-1252, which is what
+ * Excel's default "CSV (Comma delimited)" format writes on UK Windows — so
+ * "Café" and "£" survive instead of turning into replacement characters.
+ */
+export function decodeCsvBytes(bytes: ArrayBuffer | Uint8Array): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
 }
 
 /**

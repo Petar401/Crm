@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { CSV_BOM, csvCell, parseCsv, parseCsvRecords, toCsv } from "./csv";
+import {
+  CSV_BOM,
+  csvCell,
+  decodeCsvBytes,
+  parseCsv,
+  parseCsvRecords,
+  toCsv,
+  unguardCsvCell,
+} from "./csv";
 
 describe("csvCell", () => {
   it("quotes cells with commas, quotes or newlines", () => {
@@ -13,8 +21,18 @@ describe("csvCell", () => {
   it("neutralises spreadsheet formulas", () => {
     expect(csvCell("=HYPERLINK(\"http://x\")")).toBe(`"'=HYPERLINK(""http://x"")"`);
     expect(csvCell("@SUM(A1)")).toBe("'@SUM(A1)");
-    expect(csvCell("+44 20 7946 0000")).toBe("'+44 20 7946 0000");
     expect(csvCell("-cmd")).toBe("'-cmd");
+    expect(csvCell("+cmd|' /C calc'!A0")).toBe("'+cmd|' /C calc'!A0");
+  });
+
+  it("leaves phone numbers alone", () => {
+    expect(csvCell("+44 20 7946 0000")).toBe("+44 20 7946 0000");
+    expect(csvCell("(01603) 123-456")).toBe("(01603) 123-456");
+  });
+
+  it("round-trips guarded cells through unguardCsvCell", () => {
+    expect(unguardCsvCell(csvCell("=HYPERLINK(1)"))).toBe("=HYPERLINK(1)");
+    expect(unguardCsvCell("'plain quote")).toBe("'plain quote");
   });
 
   it("leaves numbers alone", () => {
@@ -84,5 +102,18 @@ describe("parseCsvRecords", () => {
 
   it("returns nothing for empty input", () => {
     expect(parseCsvRecords("")).toEqual({ headers: [], records: [] });
+  });
+});
+
+describe("decodeCsvBytes", () => {
+  it("reads UTF-8", () => {
+    const bytes = new TextEncoder().encode("Name\nCafé £5\n");
+    expect(decodeCsvBytes(bytes)).toBe("Name\nCafé £5\n");
+  });
+
+  it("falls back to Windows-1252 for Excel's default CSV", () => {
+    // "Café £5" in Windows-1252: é = 0xE9, £ = 0xA3.
+    const bytes = new Uint8Array([0x43, 0x61, 0x66, 0xe9, 0x20, 0xa3, 0x35]);
+    expect(decodeCsvBytes(bytes)).toBe("Café £5");
   });
 });

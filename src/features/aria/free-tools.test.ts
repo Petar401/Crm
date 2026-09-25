@@ -26,6 +26,12 @@ describe("Aria free tools", () => {
     expect(await runFreeTool("drop_tables", "{}")).toBeNull();
   });
 
+  it("ignores Object.prototype names", async () => {
+    expect(await runFreeTool("constructor", "{}")).toBeNull();
+    expect(await runFreeTool("toString", "{}")).toBeNull();
+    expect(await runFreeTool("__proto__", "{}")).toBeNull();
+  });
+
   it("reports invalid JSON arguments instead of throwing", async () => {
     expect(await runFreeTool("lookup_uk_postcode", "{not json")).toMatch(/invalid arguments/);
   });

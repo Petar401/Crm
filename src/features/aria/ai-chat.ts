@@ -8,7 +8,7 @@ import type { AiCredentials } from "@/features/ai/settings-queries";
 import { FREE_TOOL_DEFINITIONS, runFreeTool } from "@/features/aria/free-tools";
 
 /** Safety bound on the tool-calling loop (rounds of tool calls). */
-const MAX_TOOL_ROUNDS = 4;
+const MAX_TOOL_ROUNDS = 6;
 
 const SYSTEM_INSTRUCTION = `You are Aria, a smart and helpful AI assistant embedded in a B2B sales CRM. Your team's full CRM data is provided as context at the start of each conversation.
 
@@ -210,6 +210,32 @@ export async function runAriaChat(
       );
     }
     choice = completion.choices[0].message;
+  }
+
+  // Hit the round limit while the model still wanted tools: ask once more,
+  // with tools disabled, for an answer from what it has gathered so far —
+  // otherwise the user would get an empty reply.
+  if (toolsEnabled && choice.tool_calls?.length && !choice.content?.trim()) {
+    try {
+      const final = await client.chat.completions.create({
+        model,
+        messages: [
+          ...messages,
+          {
+            role: "user",
+            content:
+              "Please answer now using the information you already have, without calling more tools.",
+          },
+        ],
+        tools: TOOLS,
+        tool_choice: "none",
+      });
+      const text = final.choices?.[0]?.message?.content?.trim();
+      if (text) return text;
+    } catch (e) {
+      console.error(`Aria: final no-tools completion failed for model "${model}":`, e);
+    }
+    return "I gathered some information but couldn't finish the answer. Try asking a narrower question.";
   }
 
   return choice.content?.trim() ?? "";

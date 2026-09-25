@@ -1,3 +1,5 @@
+import { unguardCsvCell } from "@/lib/utils/csv";
+
 /**
  * Maps CSV records (keys already normalised by `parseCsvRecords`) onto CRM
  * fields for the import dialog. Pure, so the client preview and the server
@@ -84,14 +86,20 @@ export function detectColumns(
   return mapping;
 }
 
-/** Applies a column mapping to one record, trimming and capping values. */
+/**
+ * Applies a column mapping to one record: trims, removes the CSV export's
+ * formula-guard apostrophe, and caps the length.
+ */
 export function mapRecord(
   record: Readonly<Record<string, string>>,
   mapping: Readonly<Record<string, string>>
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [field, header] of Object.entries(mapping)) {
-    const value = (record[header] ?? "").trim().slice(0, IMPORT_MAX_CELL);
+    const value = unguardCsvCell((record[header] ?? "").trim()).slice(
+      0,
+      IMPORT_MAX_CELL
+    );
     if (value) out[field] = value;
   }
   return out;

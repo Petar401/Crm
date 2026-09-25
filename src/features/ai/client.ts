@@ -20,6 +20,8 @@ export interface AiChatClient {
           model: string;
           messages: OpenAI.Chat.ChatCompletionMessageParam[];
           tools?: OpenAI.Chat.ChatCompletionTool[];
+          /** "none" asks for a plain answer even though tools are listed. */
+          tool_choice?: "none" | "auto";
         },
         options?: { signal?: AbortSignal }
       ): Promise<OpenAI.Chat.ChatCompletion>;

@@ -13,7 +13,7 @@ import {
   mapRecord,
   type ImportEntity,
 } from "@/features/tools/import-mapping";
-import { parseCsvRecords } from "@/lib/utils/csv";
+import { parseCsvRecords, decodeCsvBytes } from "@/lib/utils/csv";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -102,7 +102,7 @@ export function ImportDialog({ entity, canCreateCompanies = false }: ImportDialo
       return;
     }
 
-    const text = await file.text();
+    const text = decodeCsvBytes(await file.arrayBuffer());
     const parsed = parseCsvRecords(text);
     setFileName(file.name);
     setHeaders(parsed.headers);
@@ -123,14 +123,29 @@ export function ImportDialog({ entity, canCreateCompanies = false }: ImportDialo
     startTransition(async () => {
       const res = await importRecords(entity, records, { createMissingCompanies });
       setResult(res);
+      const wroteSomething = res.created > 0 || (res.companiesCreated ?? 0) > 0;
+      if (wroteSomething) {
+        // Clear the file so the same rows can't be imported twice by a
+        // second click; the summary stays visible below.
+        setRecords([]);
+        setHeaders([]);
+        setFileName(null);
+        router.refresh();
+      }
       if (res.error) {
-        toast.error(res.error);
+        toast.error(
+          wroteSomething
+            ? `Imported ${res.created} before an error: ${res.error}`
+            : res.error
+        );
         return;
       }
+      const extra = res.companiesCreated
+        ? `, created ${res.companiesCreated} new compan${res.companiesCreated === 1 ? "y" : "ies"}`
+        : "";
       toast.success(
-        `Imported ${res.created}, skipped ${res.skipped} duplicate${res.skipped === 1 ? "" : "s"}`
+        `Imported ${res.created}${extra}, skipped ${res.skipped} duplicate${res.skipped === 1 ? "" : "s"}`
       );
-      router.refresh();
     });
   }
 

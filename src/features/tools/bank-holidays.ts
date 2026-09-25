@@ -1,5 +1,14 @@
 import "server-only";
 
+import {
+  bankHolidayOn,
+  todayInUk,
+  upcomingHolidays,
+  type BankHoliday,
+} from "@/lib/utils/bank-holidays";
+
+export { bankHolidayOn, todayInUk, upcomingHolidays, type BankHoliday };
+
 /**
  * UK bank holidays from GOV.UK's public JSON feed — no API key or signup.
  * Cached for a day by Next's fetch cache; the feed changes a few times a year.
@@ -17,13 +26,6 @@ export type BankHolidayDivision = (typeof BANK_HOLIDAY_DIVISIONS)[number];
 
 /** Default for an East Anglia business. */
 export const DEFAULT_DIVISION: BankHolidayDivision = "england-and-wales";
-
-export interface BankHoliday {
-  /** "YYYY-MM-DD" */
-  date: string;
-  title: string;
-  notes: string;
-}
 
 export type BankHolidayFeed = Partial<
   Record<BankHolidayDivision, { events: BankHoliday[] }>
@@ -44,21 +46,34 @@ export function isDivision(value: unknown): value is BankHolidayDivision {
  */
 const MEMO_OK_MS = REVALIDATE_S * 1000;
 const MEMO_FAIL_MS = 5 * 60 * 1000;
-let memo: { at: number; feed: BankHolidayFeed | null } | null = null;
+/** The last good feed is kept (served stale) when a refresh fails. */
+let memo: { at: number; feed: BankHolidayFeed | null; ok: boolean } | null = null;
+/** One fetch at a time: concurrent requests at expiry share it. */
+let inflight: Promise<BankHolidayFeed | null> | null = null;
 
 /** Fetches the feed. Returns null when GOV.UK can't be reached. */
 export async function fetchBankHolidayFeed(): Promise<BankHolidayFeed | null> {
-  if (memo && Date.now() - memo.at < (memo.feed ? MEMO_OK_MS : MEMO_FAIL_MS)) {
+  if (memo && Date.now() - memo.at < (memo.ok ? MEMO_OK_MS : MEMO_FAIL_MS)) {
     return memo.feed;
   }
-  const feed = await fetchFeedUncached();
-  memo = { at: Date.now(), feed };
-  return feed;
+  inflight ??= fetchFeedUncached()
+    .then((feed) => {
+      memo = feed
+        ? { at: Date.now(), feed, ok: true }
+        : // Keep serving the last good feed; retry after the short interval.
+          { at: Date.now(), feed: memo?.feed ?? null, ok: false };
+      return memo.feed;
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
 }
 
 /** Test hook: forget the memoised feed. */
 export function resetBankHolidayMemo(): void {
   memo = null;
+  inflight = null;
 }
 
 async function fetchFeedUncached(): Promise<BankHolidayFeed | null> {
@@ -87,33 +102,8 @@ export function holidaysFor(
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** The next `count` holidays on or after `from` ("YYYY-MM-DD"). */
-export function upcomingHolidays(
-  holidays: readonly BankHoliday[],
-  from: string,
-  count = 3
-): BankHoliday[] {
-  return holidays.filter((h) => h.date >= from).slice(0, count);
-}
 
-/** The holiday falling on a date ("YYYY-MM-DD" or ISO timestamp), if any. */
-export function bankHolidayOn(
-  holidays: readonly BankHoliday[],
-  date: string
-): BankHoliday | null {
-  const day = date.slice(0, 10);
-  return holidays.find((h) => h.date === day) ?? null;
-}
 
-/** Today's date in the UK ("YYYY-MM-DD"), independent of the server's zone. */
-export function todayInUk(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/London",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
-}
 
 /** Convenience: fetch + filter in one call, for pages, Aria and MCP. */
 export async function getBankHolidays(

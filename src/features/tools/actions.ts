@@ -41,15 +41,9 @@ export async function checkEmailDomainAction(
   email: string
 ): Promise<EmailDomainResult> {
   await requireAuthContext();
-  if (typeof email !== "string" || email.length > 320) {
-    return {
-      status: "invalid",
-      domain: null,
-      mx: [],
-      message: "This email address or its domain doesn't exist.",
-    };
-  }
-  return checkEmailDomain(email);
+  // An over-long or non-string value is reported as invalid without DNS.
+  const value = typeof email === "string" && email.length <= 320 ? email : "";
+  return checkEmailDomain(value);
 }
 
 // ----------------------------------------------------------------- import
@@ -57,6 +51,8 @@ export async function checkEmailDomainAction(
 export interface ImportResult {
   error?: string;
   created: number;
+  /** Contacts only: companies created for rows naming one that didn't exist. */
+  companiesCreated?: number;
   skipped: number;
   /** Row numbers match the spreadsheet (row 1 is the header). */
   errors: { row: number; message: string }[];
@@ -68,32 +64,38 @@ const recordsSchema = z
 
 const MAX_REPORTED_ERRORS = 50;
 const INSERT_BATCH = 200;
+/** Upper bound on existing rows read for duplicate detection. */
+const MAX_SCAN = 100_000;
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 
-/** Existing values of one column in the workspace, as match keys. */
-async function existingKeys(
+/**
+ * Reads the given columns of every row in a workspace table, in a stable
+ * order. Advances by the rows actually returned, so it's correct whatever
+ * the PostgREST max-rows setting is (an unordered or fixed-stride scan can
+ * skip or repeat rows, which would let duplicates through).
+ */
+async function scanWorkspace<T>(
   supabase: Client,
   table: "companies" | "contacts",
-  column: "name" | "email",
+  columns: string,
   workspaceId: string
-): Promise<Map<string, string>> {
-  const keys = new Map<string, string>();
-  for (let from = 0; from < 20_000; from += 1000) {
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; from < MAX_SCAN; ) {
     const { data, error } = await supabase
       .from(table)
-      .select(`id, ${column}`)
+      .select(columns)
       .eq("workspace_id", workspaceId)
+      .order("id", { ascending: true })
       .range(from, from + 999);
     if (error) throw new Error(error.message);
-    const rows = (data ?? []) as unknown as Record<string, string | null>[];
-    for (const r of rows) {
-      const key = matchKey(r[column]);
-      if (key && r.id) keys.set(key, r.id);
-    }
-    if (rows.length < 1000) break;
+    const page = (data ?? []) as unknown as T[];
+    if (page.length === 0) break;
+    out.push(...page);
+    from += page.length;
   }
-  return keys;
+  return out;
 }
 
 async function insertBatches(
@@ -111,11 +113,26 @@ async function insertBatches(
   return { inserted };
 }
 
+/** Duplicate key for a contact: its email, or else name + company. */
+function contactKey(
+  email: string | null | undefined,
+  first: string,
+  last: string,
+  companyKey: string
+): string {
+  const e = matchKey(email);
+  return e ? `e:${e}` : `n:${matchKey(first)}|${matchKey(last)}|${companyKey}`;
+}
+
+const contactRowSchema = contactSchema.omit({ company_id: true });
+
 /**
  * Imports companies or contacts from parsed CSV records. Every row is
  * re-mapped and validated with the same Zod schema as the create forms.
- * Duplicates (company name / contact email already in the workspace or earlier
- * in the file) are skipped, not updated.
+ * Duplicates (a company name, or a contact's email — or name + company when
+ * there's no email — already in the workspace or earlier in the file) are
+ * skipped, not updated. Missing companies are only created for contact rows
+ * that passed validation and aren't duplicates.
  */
 export async function importRecords(
   entity: ImportEntity,
@@ -151,22 +168,33 @@ export async function importRecords(
     created_by: ctx.userId,
   };
   let skipped = 0;
-  const rows: Record<string, unknown>[] = [];
 
   try {
+    const companyRows = await scanWorkspace<{ id: string; name: string | null }>(
+      supabase,
+      "companies",
+      "id, name",
+      ctx.workspace.id
+    );
+    const companyIdByKey = new Map<string, string>();
+    for (const c of companyRows) {
+      const key = matchKey(c.name);
+      if (key && !companyIdByKey.has(key)) companyIdByKey.set(key, c.id);
+    }
+
     if (entity === "companies") {
       if (!mapping.name) {
         return { ...empty, error: "No company name column found (e.g. \"Name\" or \"Company\")." };
       }
-      const seen = await existingKeys(supabase, "companies", "name", ctx.workspace.id);
+      const seen = new Set(companyIdByKey.keys());
+      const rows: Record<string, unknown>[] = [];
       parsed.data.forEach((record, i) => {
         const fields = mapRecord(record, mapping);
         const status = matchKey(fields.status);
-        const candidate = {
+        const result = companySchema.safeParse({
           ...fields,
           status: (companyStatuses as readonly string[]).includes(status) ? status : "lead",
-        };
-        const result = companySchema.safeParse(candidate);
+        });
         if (!result.success) {
           return addError(i + 2, result.error.issues[0]?.message ?? "Invalid row");
         }
@@ -175,53 +203,56 @@ export async function importRecords(
           skipped++;
           return;
         }
-        seen.set(key, "");
+        seen.add(key);
         rows.push({ ...result.data, ...base });
       });
       const { inserted, error } = await insertBatches(supabase, "companies", rows);
-      if (error) return { created: inserted, skipped, errors, error };
-      await finish(ctx.workspace.id, ctx.userId, entity, inserted);
-      return { created: inserted, skipped, errors };
+      if (inserted > 0) await finish(ctx.workspace.id, ctx.userId, entity, { count: inserted });
+      return { created: inserted, skipped, errors, ...(error ? { error } : {}) };
     }
 
     // Contacts: every contact belongs to a company, matched by name.
     if (!mapping.company) {
       return { ...empty, error: "No company column found — every contact needs a company." };
     }
-    const companies = await existingKeys(supabase, "companies", "name", ctx.workspace.id);
-    const emails = await existingKeys(supabase, "contacts", "email", ctx.workspace.id);
+    const companyKeyById = new Map(
+      companyRows.map((c) => [c.id, matchKey(c.name)] as const)
+    );
+    const existingContacts = await scanWorkspace<{
+      email: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      company_id: string | null;
+    }>(supabase, "contacts", "email, first_name, last_name, company_id", ctx.workspace.id);
+    const seen = new Set(
+      existingContacts.map((c) =>
+        contactKey(
+          c.email,
+          c.first_name ?? "",
+          c.last_name ?? "",
+          companyKeyById.get(c.company_id ?? "") ?? ""
+        )
+      )
+    );
     const mayCreateCompanies =
       Boolean(opts.createMissingCompanies) && (await can("companies.create"));
 
-    for (const [i, record] of parsed.data.entries()) {
+    // Pass 1: validate and de-duplicate, before anything is written.
+    const pending: {
+      row: number;
+      companyName: string;
+      companyKey: string;
+      data: z.infer<typeof contactRowSchema>;
+    }[] = [];
+    parsed.data.forEach((record, i) => {
       const fields = mapRecord(record, mapping);
       const companyKey = matchKey(fields.company);
-      if (!companyKey) {
-        addError(i + 2, "Company is required.");
-        continue;
+      if (!companyKey) return addError(i + 2, "Company is required.");
+      if (!companyIdByKey.has(companyKey) && !mayCreateCompanies) {
+        return addError(i + 2, `Company "${fields.company}" doesn't exist.`);
       }
-      let companyId = companies.get(companyKey);
-      if (!companyId && mayCreateCompanies) {
-        const { data, error } = await supabase
-          .from("companies")
-          .insert({ name: fields.company, status: "lead", ...base })
-          .select("id")
-          .single<{ id: string }>();
-        if (error || !data) {
-          addError(i + 2, `Could not create company "${fields.company}".`);
-          continue;
-        }
-        companyId = data.id;
-        companies.set(companyKey, companyId);
-      }
-      if (!companyId) {
-        addError(i + 2, `Company "${fields.company}" doesn't exist.`);
-        continue;
-      }
-
       const { first, last } = contactNameParts(fields);
-      const result = contactSchema.safeParse({
-        company_id: companyId,
+      const result = contactRowSchema.safeParse({
         first_name: first,
         last_name: last,
         email: fields.email ?? "",
@@ -232,22 +263,63 @@ export async function importRecords(
         is_primary: false,
       });
       if (!result.success) {
-        addError(i + 2, result.error.issues[0]?.message ?? "Invalid row");
-        continue;
+        return addError(i + 2, result.error.issues[0]?.message ?? "Invalid row");
       }
-      const emailKey = matchKey(result.data.email);
-      if (emailKey && emails.has(emailKey)) {
+      const key = contactKey(result.data.email, first, last, companyKey);
+      if (seen.has(key)) {
         skipped++;
-        continue;
+        return;
       }
-      if (emailKey) emails.set(emailKey, "");
-      rows.push({ ...result.data, ...base });
+      seen.add(key);
+      pending.push({ row: i + 2, companyName: fields.company!, companyKey, data: result.data });
+    });
+
+    // Pass 2: create the missing companies the surviving rows need, in one go.
+    let companiesCreated = 0;
+    const missing = new Map<string, string>();
+    for (const p of pending) {
+      if (!companyIdByKey.has(p.companyKey)) missing.set(p.companyKey, p.companyName);
+    }
+    if (missing.size > 0) {
+      const { data, error } = await supabase
+        .from("companies")
+        .insert(
+          Array.from(missing.values()).map((name) => ({ name, status: "lead", ...base }))
+        )
+        .select("id, name");
+      if (error) {
+        return { ...empty, skipped, errors, error: `Could not create companies: ${error.message}` };
+      }
+      for (const c of (data ?? []) as { id: string; name: string }[]) {
+        companyIdByKey.set(matchKey(c.name), c.id);
+      }
+      companiesCreated = data?.length ?? 0;
     }
 
+    // Pass 3: insert the contacts.
+    const rows: Record<string, unknown>[] = [];
+    for (const p of pending) {
+      const companyId = companyIdByKey.get(p.companyKey);
+      if (!companyId) {
+        addError(p.row, `Company "${p.companyName}" doesn't exist.`);
+        continue;
+      }
+      rows.push({ ...p.data, company_id: companyId, ...base });
+    }
     const { inserted, error } = await insertBatches(supabase, "contacts", rows);
-    if (error) return { created: inserted, skipped, errors, error };
-    await finish(ctx.workspace.id, ctx.userId, entity, inserted);
-    return { created: inserted, skipped, errors };
+    if (inserted > 0 || companiesCreated > 0) {
+      await finish(ctx.workspace.id, ctx.userId, entity, {
+        count: inserted,
+        companiesCreated,
+      });
+    }
+    return {
+      created: inserted,
+      companiesCreated,
+      skipped,
+      errors,
+      ...(error ? { error } : {}),
+    };
   } catch (e) {
     return { ...empty, error: e instanceof Error ? e.message : "Import failed." };
   }
@@ -257,14 +329,14 @@ async function finish(
   workspaceId: string,
   userId: string,
   entity: ImportEntity,
-  count: number
+  after: { count: number; companiesCreated?: number }
 ): Promise<void> {
   await auditLog({
     workspaceId,
     actorUserId: userId,
     action: "records.imported",
     entityType: entity,
-    after: { count },
+    after,
   });
   revalidatePath(`/${entity}`);
   if (entity === "contacts") revalidatePath("/companies");

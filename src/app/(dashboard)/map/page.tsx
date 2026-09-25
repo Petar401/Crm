@@ -12,6 +12,39 @@ import { PageHeader } from "@/components/shared/page-header";
 export const dynamic = "force-dynamic";
 
 const MAX_ROWS = 2000;
+const PAGE_SIZE = 1000;
+
+type Client = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * Reads up to MAX_ROWS rows with a postcode, page by page — a single
+ * `.limit(2000)` is silently capped by PostgREST's max-rows (1000 on
+ * Supabase). Throws on a query error so the page can say so.
+ */
+async function loadWithPostcodes<T>(
+  supabase: Client,
+  table: "companies" | "leads",
+  columns: string,
+  postcodeColumn: "postcode" | "postal_code",
+  workspaceId: string
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; from < MAX_ROWS; ) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .eq("workspace_id", workspaceId)
+      .not(postcodeColumn, "is", null)
+      .order("id", { ascending: true })
+      .range(from, Math.min(from + PAGE_SIZE, MAX_ROWS) - 1);
+    if (error) throw new Error(error.message);
+    const page = (data ?? []) as unknown as T[];
+    if (page.length === 0) break;
+    rows.push(...page);
+    from += page.length;
+  }
+  return rows;
+}
 
 interface CompanyRow {
   id: string;
@@ -38,27 +71,33 @@ export default async function MapPage() {
 
   const supabase = await createClient();
 
-  const [companiesResult, leadsResult] = await Promise.all([
+  let loadError: string | null = null;
+  const [companies, leads] = await Promise.all([
     canViewCompanies
-      ? supabase
-          .from("companies")
-          .select("id, name, postcode, city, status")
-          .eq("workspace_id", ctx.workspace.id)
-          .not("postcode", "is", null)
-          .limit(MAX_ROWS)
-      : Promise.resolve({ data: [] as CompanyRow[] | null }),
+      ? loadWithPostcodes<CompanyRow>(
+          supabase,
+          "companies",
+          "id, name, postcode, city, status",
+          "postcode",
+          ctx.workspace.id
+        ).catch((e: Error) => {
+          loadError = e.message;
+          return [] as CompanyRow[];
+        })
+      : ([] as CompanyRow[]),
     canViewLeads
-      ? supabase
-          .from("leads")
-          .select("id, company_name, postal_code, city, status")
-          .eq("workspace_id", ctx.workspace.id)
-          .not("postal_code", "is", null)
-          .limit(MAX_ROWS)
-      : Promise.resolve({ data: [] as LeadRow[] | null }),
+      ? loadWithPostcodes<LeadRow>(
+          supabase,
+          "leads",
+          "id, company_name, postal_code, city, status",
+          "postal_code",
+          ctx.workspace.id
+        ).catch((e: Error) => {
+          loadError = e.message;
+          return [] as LeadRow[];
+        })
+      : ([] as LeadRow[]),
   ]);
-
-  const companies = (companiesResult.data ?? []) as CompanyRow[];
-  const leads = (leadsResult.data ?? []) as LeadRow[];
 
   const postcodes = await bulkLookupPostcodes([
     ...companies.map((c) => c.postcode),
@@ -112,6 +151,16 @@ export default async function MapPage() {
         title="Map"
         description="Companies and leads plotted by UK postcode"
       />
+      {loadError && (
+        <p className="text-destructive mb-3 text-sm">
+          Some records couldn&apos;t be loaded ({loadError}). The map may be incomplete.
+        </p>
+      )}
+      {(companies.length >= MAX_ROWS || leads.length >= MAX_ROWS) && (
+        <p className="text-muted-foreground mb-3 text-sm">
+          Showing the first {MAX_ROWS.toLocaleString("en-GB")} records of each type.
+        </p>
+      )}
       <RecordsMapLoader points={points} notPlacedCount={notPlaced} />
     </div>
   );

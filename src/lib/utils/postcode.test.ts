@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { isValidUkPostcode, normalizeUkPostcode } from "./postcode";
+import {
+  addressFillFromPostcode,
+  isValidUkPostcode,
+  normalizeUkPostcode,
+} from "./postcode";
 
 describe("normalizeUkPostcode", () => {
   it("formats every UK postcode shape", () => {
@@ -21,5 +25,32 @@ describe("normalizeUkPostcode", () => {
     expect(normalizeUkPostcode(null)).toBeNull();
     expect(isValidUkPostcode("CB2 1AN")).toBe(true);
     expect(isValidUkPostcode("CB2 1AN; DROP")).toBe(false);
+  });
+});
+
+describe("addressFillFromPostcode", () => {
+  const place = { district: "Broadland", county: "Norfolk" };
+
+  it("fills only empty fields", () => {
+    expect(addressFillFromPostcode(place, { city: "Aylsham", country: "" })).toEqual({
+      country: "United Kingdom",
+    });
+    expect(addressFillFromPostcode(place, { city: "", county: "", country: "UK" })).toEqual({
+      city: "Broadland",
+      county: "Norfolk",
+    });
+  });
+
+  it("uses the district as county for unitary authorities, never the nation", () => {
+    expect(
+      addressFillFromPostcode({ district: "Peterborough", county: null }, { county: "" })
+    ).toMatchObject({ county: "Peterborough" });
+  });
+
+  it("doesn't touch county when the form has no county field", () => {
+    expect(addressFillFromPostcode(place, { city: "" })).toEqual({
+      city: "Broadland",
+      country: "United Kingdom",
+    });
   });
 });

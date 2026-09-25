@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { leadSchema, type LeadInput } from "@/features/leads/schemas";
 import { createLead, updateLead } from "@/features/leads/actions";
 import { lookupPostcodeAction } from "@/features/tools/actions";
+import { addressFillFromPostcode } from "@/lib/utils/postcode";
 import type { MemberOption } from "@/features/team/queries";
 import type { Lead } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
@@ -83,15 +84,19 @@ export function LeadForm({ open, onOpenChange, members, lead }: LeadFormProps) {
       const result = await lookupPostcodeAction(postalCode);
       if (result.status === "ok") {
         form.setValue("postal_code", result.info.postcode, { shouldDirty: true });
-        if (result.info.district) {
-          form.setValue("city", result.info.district, { shouldDirty: true });
-        }
-        const state = result.info.county ?? result.info.nation;
-        if (state) {
-          form.setValue("state", state, { shouldDirty: true });
-        }
-        form.setValue("country", "United Kingdom", { shouldDirty: true });
-        toast.success("Postcode found");
+        const fill = addressFillFromPostcode(result.info, {
+          city: form.getValues("city"),
+          county: form.getValues("state"),
+          country: form.getValues("country"),
+        });
+        if (fill.city) form.setValue("city", fill.city, { shouldDirty: true });
+        if (fill.county) form.setValue("state", fill.county, { shouldDirty: true });
+        if (fill.country) form.setValue("country", fill.country, { shouldDirty: true });
+        toast.success(
+          result.info.district
+            ? `Postcode found: ${result.info.district}`
+            : "Postcode found"
+        );
       } else if (result.status === "invalid") {
         toast.error("That doesn't look like a UK postcode.");
       } else if (result.status === "not_found") {

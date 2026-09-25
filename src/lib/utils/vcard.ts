@@ -1,4 +1,4 @@
-import { foldIcsLine } from "@/lib/utils/ics";
+import { escapeIcsText, foldIcsLine } from "@/lib/utils/ics";
 
 /**
  * vCard 3.0 builder (RFC 2426) for exporting contacts to phone and desktop
@@ -17,14 +17,8 @@ export interface VCardContact {
   note?: string | null;
 }
 
-/** Escapes TEXT values: backslash, semicolon, comma and newlines. */
-export function escapeVCardText(value: string): string {
-  return value
-    .replace(/\\/g, "\\\\")
-    .replace(/;/g, "\\;")
-    .replace(/,/g, "\\,")
-    .replace(/\r\n|\r|\n/g, "\\n");
-}
+/** vCard TEXT escaping is the same as iCalendar's (RFC 2426 §4 / RFC 5545). */
+export const escapeVCardText = escapeIcsText;
 
 function clean(value: string | null | undefined): string {
   return (value ?? "").trim();

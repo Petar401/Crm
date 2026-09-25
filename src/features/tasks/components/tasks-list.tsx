@@ -10,7 +10,7 @@ import type { MemberOption } from "@/features/team/queries";
 import { deleteTask, setTaskStatus } from "@/features/tasks/actions";
 import { TaskForm } from "@/features/tasks/components/task-form";
 import { formatDateTime } from "@/lib/utils/format";
-import { bankHolidayOnClient, type BankHolidaySlim } from "@/lib/utils/bank-holidays";
+import { bankHolidayOn, type BankHolidaySlim } from "@/lib/utils/bank-holidays";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -95,7 +95,7 @@ export function TasksList({
         <div className="divide-y rounded-lg border">
           {tasks.map((task) => {
             const done = task.status === "done";
-            const holiday = bankHolidayOnClient(bankHolidays, task.due_at);
+            const holiday = bankHolidayOn(bankHolidays, task.due_at);
             return (
               <div
                 key={task.id}
