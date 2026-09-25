@@ -228,6 +228,26 @@ export async function deletePriceBook(id: string): Promise<ActionResult> {
   return {};
 }
 
+/**
+ * `price_book_entries` has no workspace_id of its own, so confirm the parent
+ * price book (and product) belong to the active workspace before writing.
+ * RLS enforces the same through `price_books`; this keeps the app layer from
+ * relying on it alone (e.g. for a member of several workspaces).
+ */
+async function priceBookInWorkspace(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  priceBookId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("price_books")
+    .select("id")
+    .eq("id", priceBookId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle<{ id: string }>();
+  return Boolean(data);
+}
+
 export async function setPriceBookEntry(
   priceBookId: string,
   values: unknown
@@ -236,9 +256,21 @@ export async function setPriceBookEntry(
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
-  await requireAuthContext();
+  const ctx = await requireAuthContext();
   await requirePermission("products.update");
   const supabase = await createClient();
+  const { data: product } = await supabase
+    .from("products")
+    .select("id")
+    .eq("id", parsed.data.product_id)
+    .eq("workspace_id", ctx.workspace.id)
+    .maybeSingle<{ id: string }>();
+  if (
+    !product ||
+    !(await priceBookInWorkspace(supabase, ctx.workspace.id, priceBookId))
+  ) {
+    return { error: "Price book or product not found." };
+  }
   const { error } = await supabase
     .from("price_book_entries")
     .upsert(
@@ -257,9 +289,20 @@ export async function setPriceBookEntry(
 export async function deletePriceBookEntry(
   id: string
 ): Promise<ActionResult> {
-  await requireAuthContext();
+  const ctx = await requireAuthContext();
   await requirePermission("products.update");
   const supabase = await createClient();
+  const { data: entry } = await supabase
+    .from("price_book_entries")
+    .select("price_book_id")
+    .eq("id", id)
+    .maybeSingle<{ price_book_id: string }>();
+  if (
+    !entry ||
+    !(await priceBookInWorkspace(supabase, ctx.workspace.id, entry.price_book_id))
+  ) {
+    return { error: "Price book entry not found." };
+  }
   const { error } = await supabase
     .from("price_book_entries")
     .delete()

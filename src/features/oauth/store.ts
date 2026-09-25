@@ -218,7 +218,9 @@ export async function issueTokens(
  */
 export async function rotateRefreshToken(
   refreshToken: string,
-  expectedClientId?: string
+  expectedClientId?: string,
+  /** Extra check on the grant's client (e.g. confidential-client secret). */
+  authenticateClient?: (clientId: string) => Promise<boolean>
 ): Promise<IssuedTokens | null> {
   const admin = createAdminClient();
   const { data: row } = await admin
@@ -234,6 +236,9 @@ export async function rotateRefreshToken(
 
   if (!row) return null;
   if (expectedClientId && row.client_id !== expectedClientId) return null;
+  if (authenticateClient && !(await authenticateClient(row.client_id))) {
+    return null;
+  }
   if (row.refresh_expires_at && new Date(row.refresh_expires_at) < new Date()) {
     return null;
   }

@@ -19,11 +19,18 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 const TTL_MS = 10 * 60 * 1000;
 
+/**
+ * A dedicated AUTH_CSRF_SECRET wins when set, so the HMAC key isn't coupled to
+ * the Supabase service-role key (rotating that key after a leak would otherwise
+ * silently change CSRF validity too). Falls back to the service-role key so
+ * existing deployments keep working without a new env var.
+ */
 function secret(): string {
-  const s = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.AUTH_CSRF_SECRET;
+  const s =
+    process.env.AUTH_CSRF_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!s) {
     throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY (or AUTH_CSRF_SECRET) is required to sign OAuth CSRF tokens"
+      "AUTH_CSRF_SECRET (or SUPABASE_SERVICE_ROLE_KEY) is required to sign OAuth CSRF tokens"
     );
   }
   return s;

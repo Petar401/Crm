@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
@@ -78,7 +78,7 @@ export function DealForm({
     },
   });
 
-  const selectedCompany = form.watch("company_id");
+  const selectedCompany = useWatch({ control: form.control, name: "company_id" });
   const companyContacts = contacts.filter(
     (c) => c.company_id === selectedCompany
   );

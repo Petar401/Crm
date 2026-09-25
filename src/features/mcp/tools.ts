@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 
 import { requireAuthContext } from "@/lib/auth/session";
-import { requirePermission } from "@/lib/auth/permissions";
+import { getPermissionSet, requirePermission } from "@/lib/auth/permissions";
 import { createClient } from "@/lib/supabase/server";
 import {
   ENTITY_NAMES,
@@ -10,6 +10,7 @@ import {
   entityFieldReference,
   type EntityName,
 } from "@/features/mcp/dispatch";
+import { searchableEntities } from "@/features/mcp/search-scope";
 import { getCompanies, getCompany } from "@/features/companies/queries";
 import { getContacts, getContact } from "@/features/contacts/queries";
 import {
@@ -95,7 +96,11 @@ export function registerCrmTools(server: McpServer): void {
         "List all companies in the CRM workspace, newest first. Includes contact counts and open deal value.",
       inputSchema: z.object({}),
     },
-    async () => guard(async () => ok(await getCompanies(await workspaceId())))
+    async () =>
+      guard(async () => {
+        await requirePermission("companies.view");
+        return ok(await getCompanies(await workspaceId()));
+      })
   );
 
   server.registerTool(
@@ -108,6 +113,7 @@ export function registerCrmTools(server: McpServer): void {
     },
     async ({ id }) =>
       guard(async () => {
+        await requirePermission("companies.view");
         const ws = await workspaceId();
         const company = await getCompany(ws, id);
         if (!company) return fail("Company not found");
@@ -123,7 +129,11 @@ export function registerCrmTools(server: McpServer): void {
       description: "List all contacts in the CRM workspace with their company.",
       inputSchema: z.object({}),
     },
-    async () => guard(async () => ok(await getContacts(await workspaceId())))
+    async () =>
+      guard(async () => {
+        await requirePermission("contacts.view");
+        return ok(await getContacts(await workspaceId()));
+      })
   );
 
   server.registerTool(
@@ -135,6 +145,7 @@ export function registerCrmTools(server: McpServer): void {
     },
     async ({ id }) =>
       guard(async () => {
+        await requirePermission("contacts.view");
         const contact = await getContact(await workspaceId(), id);
         return contact ? ok(contact) : fail("Contact not found");
       })
@@ -148,7 +159,11 @@ export function registerCrmTools(server: McpServer): void {
         "List all deals with company, contact, and stage. Use list_pipelines to resolve stage ids before moving a deal.",
       inputSchema: z.object({}),
     },
-    async () => guard(async () => ok(await getDeals(await workspaceId())))
+    async () =>
+      guard(async () => {
+        await requirePermission("deals.view");
+        return ok(await getDeals(await workspaceId()));
+      })
   );
 
   server.registerTool(
@@ -160,6 +175,7 @@ export function registerCrmTools(server: McpServer): void {
     },
     async ({ id }) =>
       guard(async () => {
+        await requirePermission("deals.view");
         const ws = await workspaceId();
         const deal = await getDeal(ws, id);
         if (!deal) return fail("Deal not found");
@@ -178,6 +194,7 @@ export function registerCrmTools(server: McpServer): void {
     },
     async () =>
       guard(async () => {
+        await requirePermission("deals.view");
         const ws = await workspaceId();
         const [pipelines, stages] = await Promise.all([
           getPipelines(ws),
@@ -195,7 +212,11 @@ export function registerCrmTools(server: McpServer): void {
         "List all tasks with assignee, company, and deal, ordered by due date.",
       inputSchema: z.object({}),
     },
-    async () => guard(async () => ok(await getTasks(await workspaceId())))
+    async () =>
+      guard(async () => {
+        await requirePermission("tasks.view");
+        return ok(await getTasks(await workspaceId()));
+      })
   );
 
   server.registerTool(
@@ -212,16 +233,17 @@ export function registerCrmTools(server: McpServer): void {
       }),
     },
     async (args) =>
-      guard(async () =>
-        ok(
+      guard(async () => {
+        await requirePermission("notes.view");
+        return ok(
           await getNotes(await workspaceId(), {
             companyId: args.company_id,
             contactId: args.contact_id,
             dealId: args.deal_id,
             leadId: args.lead_id,
           })
-        )
-      )
+        );
+      })
   );
 
   server.registerTool(
@@ -233,7 +255,10 @@ export function registerCrmTools(server: McpServer): void {
       inputSchema: z.object({}),
     },
     async () =>
-      guard(async () => ok(await getNotebookNotes(await workspaceId())))
+      guard(async () => {
+        await requirePermission("notebook.view");
+        return ok(await getNotebookNotes(await workspaceId()));
+      })
   );
 
   server.registerTool(
@@ -247,7 +272,10 @@ export function registerCrmTools(server: McpServer): void {
       }),
     },
     async ({ status }) =>
-      guard(async () => ok(await getLeads(await workspaceId(), status)))
+      guard(async () => {
+        await requirePermission("leads.view");
+        return ok(await getLeads(await workspaceId(), status));
+      })
   );
 
   server.registerTool(
@@ -258,7 +286,10 @@ export function registerCrmTools(server: McpServer): void {
         "List workspace members. Use to resolve a user id for a task's assigned_to field.",
       inputSchema: z.object({}),
     },
-    async () => guard(async () => ok(await getMemberOptions(await workspaceId())))
+    async () =>
+      // Member names/ids are visible to every workspace member (same as the
+      // assignee pickers in the UI and the members_select RLS policy).
+      guard(async () => ok(await getMemberOptions(await workspaceId())))
   );
 
   server.registerTool(
@@ -282,31 +313,48 @@ export function registerCrmTools(server: McpServer): void {
         const escaped = escapePostgrestOrValue(query);
         const like = `*${escaped}*`;
 
+        // The MCP path runs on the service-role client (RLS bypassed), so each
+        // entity is only searched when the caller holds its `.view` permission
+        // — otherwise search would leak records the UI would hide.
+        const { allowed } = await getPermissionSet();
+        const scope = searchableEntities(allowed);
+        const none = Promise.resolve({ data: [] as Record<string, unknown>[] });
+
         const [companies, contacts, deals, leads] = await Promise.all([
-          supabase
-            .from("companies")
-            .select("id, name, industry, city, status")
-            .eq("workspace_id", ws)
-            .or(`name.ilike.${like},industry.ilike.${like},city.ilike.${like}`)
-            .limit(limit),
-          supabase
-            .from("contacts")
-            .select("id, company_id, full_name, email, job_title")
-            .eq("workspace_id", ws)
-            .or(`full_name.ilike.${like},email.ilike.${like}`)
-            .limit(limit),
-          supabase
-            .from("deals")
-            .select("id, company_id, name, value, currency, status")
-            .eq("workspace_id", ws)
-            .ilike("name", `%${escaped}%`)
-            .limit(limit),
-          supabase
-            .from("leads")
-            .select("id, company_name, email, city, status")
-            .eq("workspace_id", ws)
-            .or(`company_name.ilike.${like},email.ilike.${like}`)
-            .limit(limit),
+          scope.companies
+            ? supabase
+                .from("companies")
+                .select("id, name, industry, city, status")
+                .eq("workspace_id", ws)
+                .or(
+                  `name.ilike.${like},industry.ilike.${like},city.ilike.${like}`
+                )
+                .limit(limit)
+            : none,
+          scope.contacts
+            ? supabase
+                .from("contacts")
+                .select("id, company_id, full_name, email, job_title")
+                .eq("workspace_id", ws)
+                .or(`full_name.ilike.${like},email.ilike.${like}`)
+                .limit(limit)
+            : none,
+          scope.deals
+            ? supabase
+                .from("deals")
+                .select("id, company_id, name, value, currency, status")
+                .eq("workspace_id", ws)
+                .ilike("name", `%${escaped}%`)
+                .limit(limit)
+            : none,
+          scope.leads
+            ? supabase
+                .from("leads")
+                .select("id, company_name, email, city, status")
+                .eq("workspace_id", ws)
+                .or(`company_name.ilike.${like},email.ilike.${like}`)
+                .limit(limit)
+            : none,
         ]);
 
         return ok({
@@ -498,7 +546,11 @@ export function registerCrmTools(server: McpServer): void {
         "List emails previously sent from the workspace's connected mailbox.",
       inputSchema: z.object({}),
     },
-    async () => guard(async () => ok(await getSentEmails(await workspaceId())))
+    async () =>
+      guard(async () => {
+        await requirePermission("email.view");
+        return ok(await getSentEmails(await workspaceId()));
+      })
   );
 
   // ------------------------------------------------------------ ai helpers
@@ -516,6 +568,7 @@ export function registerCrmTools(server: McpServer): void {
     },
     async ({ deal_id, kind }) =>
       guard(async () => {
+        await requirePermission("deals.view");
         const result =
           kind === "next_step"
             ? await suggestNextStep(deal_id)
@@ -534,6 +587,7 @@ export function registerCrmTools(server: McpServer): void {
     },
     async ({ company_id }) =>
       guard(async () => {
+        await requirePermission("companies.view");
         const result = await companyBrief(company_id);
         return result.error ? fail(result.error) : ok({ text: result.text });
       })
@@ -549,6 +603,7 @@ export function registerCrmTools(server: McpServer): void {
     },
     async ({ lead_id }) =>
       guard(async () => {
+        await requirePermission("leads.view");
         const result = await draftLeadEmail(lead_id);
         return result.error ? fail(result.error) : ok({ text: result.text });
       })

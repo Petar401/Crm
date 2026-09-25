@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAuthContext } from "@/lib/auth/session";
-import { requirePermission } from "@/lib/auth/permissions";
+import { can, requirePermission } from "@/lib/auth/permissions";
 import { notify } from "@/features/notifications/emit";
 import { auditLog } from "@/features/audit/log";
 
@@ -16,6 +16,9 @@ export interface ActionResult {
 
 const inviteSchema = z.object({
   email: z.string().email("Enter a valid email"),
+  /** Grant the full-access bypass. Needs `team.edit_roles`, like the toggle in
+   * the permission editor. Off by default: the member gets the default role. */
+  fullAccess: z.boolean().optional(),
 });
 
 /**
@@ -31,6 +34,9 @@ export async function inviteMember(values: unknown): Promise<ActionResult> {
 
   const ctx = await requireAuthContext();
   await requirePermission("team.invite");
+  if (parsed.data.fullAccess && !(await can("team.edit_roles"))) {
+    return { error: "You don't have permission to grant full access." };
+  }
 
   const admin = createAdminClient();
   const email = parsed.data.email.toLowerCase();
@@ -65,12 +71,16 @@ export async function inviteMember(values: unknown): Promise<ActionResult> {
     .eq("is_default", true)
     .maybeSingle<{ id: string }>();
 
+  // New members are governed by the default role (matching the signup and
+  // invitation-accept paths, see 0015_signup_defaults.sql) unless the inviter
+  // explicitly grants full access. Without a default role to fall back on, full
+  // access is kept so the invitee isn't left with no permissions at all.
   const { error: memberError } = await admin.from("workspace_members").insert({
     workspace_id: ctx.workspace.id,
     user_id: userId,
     role: "member",
     role_id: role?.id ?? null,
-    is_full_access: true,
+    is_full_access: Boolean(parsed.data.fullAccess) || !role,
   });
 
   if (memberError) {
@@ -95,7 +105,7 @@ export async function inviteMember(values: unknown): Promise<ActionResult> {
     action: "member.added",
     entityType: "member",
     entityId: userId,
-    after: { email },
+    after: { email, fullAccess: Boolean(parsed.data.fullAccess) || !role },
   });
 
   revalidatePath("/settings");

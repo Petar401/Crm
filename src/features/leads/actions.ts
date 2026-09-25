@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
-import { requirePermission } from "@/lib/auth/permissions";
+import { can, requirePermission } from "@/lib/auth/permissions";
+import { isWorkspaceMember } from "@/features/team/queries";
+import {
+  findForeignReference,
+  foreignReferenceError,
+} from "@/lib/db/ownership";
 import { logActivity } from "@/features/activities/log";
 import { campaignSchema, leadSchema } from "@/features/leads/schemas";
 import { runCampaign } from "@/features/leads/generate";
@@ -165,6 +170,22 @@ function toLeadRow(input: ReturnType<typeof leadSchema.parse>) {
   };
 }
 
+/**
+ * A newly picked lead owner must be a member of this workspace. An unchanged
+ * owner is not re-checked, so a lead owned by someone who has since left can
+ * still be edited.
+ */
+async function validateOwner(
+  workspaceId: string,
+  ownerUserId: string | undefined,
+  previousOwner: string | null = null
+): Promise<string | null> {
+  if (!ownerUserId || ownerUserId === previousOwner) return null;
+  return (await isWorkspaceMember(workspaceId, ownerUserId))
+    ? null
+    : "The owner must be a member of this workspace.";
+}
+
 export async function createLead(values: unknown): Promise<ActionResult> {
   const parsed = leadSchema.safeParse(values);
   if (!parsed.success) {
@@ -173,6 +194,9 @@ export async function createLead(values: unknown): Promise<ActionResult> {
 
   const ctx = await requireAuthContext();
   await requirePermission("leads.create");
+
+  const ownerError = await validateOwner(ctx.workspace.id, parsed.data.owner_user_id);
+  if (ownerError) return { error: ownerError };
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -206,6 +230,19 @@ export async function updateLead(
   await requirePermission("leads.update");
 
   const supabase = await createClient();
+  const { data: prev } = await supabase
+    .from("leads")
+    .select("owner_user_id")
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspace.id)
+    .maybeSingle<{ owner_user_id: string | null }>();
+  const ownerError = await validateOwner(
+    ctx.workspace.id,
+    parsed.data.owner_user_id,
+    prev?.owner_user_id ?? null
+  );
+  if (ownerError) return { error: ownerError };
+
   const { error } = await supabase
     .from("leads")
     .update({ ...toLeadRow(parsed.data), updated_at: new Date().toISOString() })
@@ -269,6 +306,14 @@ export async function convertLead(
 
   const owner = lead.owner_user_id ?? ctx.userId;
 
+  if (opts.createDeal) {
+    const foreign = await findForeignReference(supabase, ctx.workspace.id, [
+      ["deal_pipelines", opts.pipelineId],
+      ["deal_stages", opts.stageId],
+    ]);
+    if (foreign) return { error: foreignReferenceError(foreign) };
+  }
+
   const { data: company, error: companyError } = await supabase
     .from("companies")
     .insert({
@@ -290,11 +335,37 @@ export async function convertLead(
 
   if (companyError) return { error: companyError.message };
 
-  // Only create a contact when we have a real person's name.
+  // Undo the partial conversion when a later insert fails, so a failed
+  // convert never leaves an orphan company/contact behind while the lead still
+  // reads as unconverted. Best-effort: the original error is what's returned.
+  const rollback = async (contact: string | null, deal: string | null = null) => {
+    if (deal) {
+      await supabase
+        .from("deals")
+        .delete()
+        .eq("id", deal)
+        .eq("workspace_id", ctx.workspace.id);
+    }
+    if (contact) {
+      await supabase
+        .from("contacts")
+        .delete()
+        .eq("id", contact)
+        .eq("workspace_id", ctx.workspace.id);
+    }
+    await supabase
+      .from("companies")
+      .delete()
+      .eq("id", company.id)
+      .eq("workspace_id", ctx.workspace.id);
+  };
+
+  // Only create a contact when we have a real person's name and the caller may
+  // create contacts (previously a missing contacts.create silently dropped it).
   let contactId: string | null = null;
-  if (lead.contact_name) {
+  if (lead.contact_name && (await can("contacts.create"))) {
     const parts = lead.contact_name.trim().split(/\s+/);
-    const { data: contact } = await supabase
+    const { data: contact, error: contactError } = await supabase
       .from("contacts")
       .insert({
         workspace_id: ctx.workspace.id,
@@ -310,13 +381,19 @@ export async function convertLead(
       })
       .select("id")
       .single<{ id: string }>();
-    contactId = contact?.id ?? null;
+    if (contactError || !contact) {
+      await rollback(null);
+      return {
+        error: `Could not create the contact: ${contactError?.message ?? "unknown error"}`,
+      };
+    }
+    contactId = contact.id;
   }
 
   let dealId: string | null = null;
   if (opts.createDeal) {
     const value = opts.dealValue ? Number(opts.dealValue) : null;
-    const { data: deal } = await supabase
+    const { data: deal, error: dealError } = await supabase
       .from("deals")
       .insert({
         workspace_id: ctx.workspace.id,
@@ -334,7 +411,13 @@ export async function convertLead(
       })
       .select("id")
       .single<{ id: string }>();
-    dealId = deal?.id ?? null;
+    if (dealError || !deal) {
+      await rollback(contactId);
+      return {
+        error: `Could not create the deal: ${dealError?.message ?? "unknown error"}`,
+      };
+    }
+    dealId = deal.id;
   }
 
   const { error } = await supabase
@@ -350,7 +433,10 @@ export async function convertLead(
     .eq("id", id)
     .eq("workspace_id", ctx.workspace.id);
 
-  if (error) return { error: error.message };
+  if (error) {
+    await rollback(contactId, dealId);
+    return { error: error.message };
+  }
 
   await logActivity({
     workspaceId: ctx.workspace.id,

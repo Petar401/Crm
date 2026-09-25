@@ -2,7 +2,7 @@
 
 A secure, multi-user CRM built with **Next.js (App Router) + TypeScript + Tailwind + shadcn/ui**
 on a **Supabase** backend (Postgres, Auth, Storage, Row Level Security), with optional
-user-triggered **Gemini AI** actions executed server-side only.
+user-triggered **AI** actions (Groq or OpenRouter) executed server-side only.
 
 ## Features
 
@@ -10,8 +10,10 @@ user-triggered **Gemini AI** actions executed server-side only.
   membership and enforced in the database with RLS.
 - **CRM modules** — Companies, Contacts, Deals (Kanban + table), Tasks, Notes, Files, and a
   shared Activity timeline, plus a KPI Dashboard.
-- **Custom permissions** — every member starts with **Full access**; switch it off to reveal a
-  grouped checkbox matrix backed by per-member overrides. Enforced in server actions **and** RLS.
+- **Custom permissions** — the workspace creator has **Full access**; new members get the
+  workspace's default role (or full access, if the inviter grants it). Switch full access off to
+  reveal a grouped checkbox matrix backed by per-member overrides. Enforced in server actions
+  **and** RLS.
 - **File uploads** — stored in Supabase Storage, scoped by workspace, with metadata records and
   image previews.
 - **AI actions** — summarise notes, suggest a deal's next step, draft a follow-up, and generate a
@@ -28,7 +30,7 @@ user-triggered **Gemini AI** actions executed server-side only.
 | UI | Tailwind CSS v4, shadcn/ui, Lucide icons |
 | Forms | React Hook Form + Zod |
 | Backend | Supabase (Postgres + Auth + Storage + RLS) |
-| AI | Google Gemini (`@google/generative-ai`), server-side only |
+| AI | Groq or OpenRouter (OpenAI-compatible `openai` SDK), server-side only |
 | Hosting | Vercel (frontend) + Supabase (backend) |
 
 ## Project structure
@@ -172,13 +174,15 @@ Notes:
   workspace membership and writes additionally require the relevant permission via the
   `has_permission(workspace_id, key)` SQL function. The same logic is mirrored in
   `lib/auth/permissions.ts` for server actions and conditional UI.
-- **Secrets stay server-side.** Gemini and the Supabase service-role key are never imported into
+- **Secrets stay server-side.** AI provider keys and the Supabase service-role key are never imported into
   client code; the service-role client is marked `server-only`.
 - **Permission resolution order:** full access → member override → role default → deny. The
   workspace owner always retains full access.
 - **API tokens are stored hashed.** Only a SHA-256 digest of a personal access token is persisted;
   the plaintext is displayed once at creation and never recoverable. MCP requests resolve the token
-  to its workspace member and run under that member's permission set.
+  to its workspace member and run under that member's permission set. Because MCP requests use
+  the service-role client, every MCP tool checks the member's `*.view` / write permission in
+  application code (RLS is bypassed on that path).
 
 ## Deployment
 
@@ -193,6 +197,6 @@ Notes:
 - [x] Full access or custom checkbox permissions per member
 - [x] Companies, contacts, deals, tasks, notes, files usable from the UI
 - [x] File uploads with saved metadata
-- [x] Gemini actions run only server-side, only for permitted users
+- [x] AI actions run only server-side, only for permitted users
 - [x] API keys not exposed to the client bundle
 - [x] Deployable on Vercel + Supabase

@@ -8,10 +8,41 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
 import { notify } from "@/features/notifications/emit";
 import { taskSchema, type TaskInput } from "@/features/tasks/schemas";
+import { isWorkspaceMember } from "@/features/team/queries";
+import {
+  findForeignReference,
+  foreignReferenceError,
+} from "@/lib/db/ownership";
 
 export interface ActionResult {
   error?: string;
   id?: string;
+}
+
+/**
+ * Validates the ids a task links to: a newly set assignee must be a workspace
+ * member and the company/deal must live in this workspace. An unchanged
+ * assignee is not re-checked, so a task still assigned to someone who has
+ * since left can be edited. Returns an error message, or null when valid.
+ */
+async function validateLinks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  row: ReturnType<typeof toRow>,
+  previousAssignee: string | null = null
+): Promise<string | null> {
+  if (
+    row.assigned_to &&
+    row.assigned_to !== previousAssignee &&
+    !(await isWorkspaceMember(workspaceId, row.assigned_to))
+  ) {
+    return "The assignee must be a member of this workspace.";
+  }
+  const foreign = await findForeignReference(supabase, workspaceId, [
+    ["companies", row.company_id],
+    ["deals", row.deal_id],
+  ]);
+  return foreign ? foreignReferenceError(foreign) : null;
 }
 
 function toRow(data: TaskInput) {
@@ -39,6 +70,9 @@ export async function createTask(values: unknown): Promise<ActionResult> {
 
   const supabase = await createClient();
   const row = toRow(parsed.data);
+  const invalid = await validateLinks(supabase, ctx.workspace.id, row);
+  if (invalid) return { error: invalid };
+
   const { data, error } = await supabase
     .from("tasks")
     .insert({
@@ -99,6 +133,14 @@ export async function updateTask(
     .eq("workspace_id", ctx.workspace.id)
     .maybeSingle<{ assigned_to: string | null }>();
   const nextRow = toRow(parsed.data);
+  const invalid = await validateLinks(
+    supabase,
+    ctx.workspace.id,
+    nextRow,
+    prev?.assigned_to ?? null
+  );
+  if (invalid) return { error: invalid };
+
   const { error } = await supabase
     .from("tasks")
     .update(nextRow)

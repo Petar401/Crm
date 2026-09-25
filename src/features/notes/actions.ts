@@ -7,6 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuthContext } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/auth/permissions";
 import { logActivity } from "@/features/activities/log";
+import {
+  findForeignReference,
+  foreignReferenceError,
+} from "@/lib/db/ownership";
 
 export interface ActionResult {
   error?: string;
@@ -30,6 +34,14 @@ export async function createNote(values: unknown): Promise<ActionResult> {
   await requirePermission("notes.create");
 
   const supabase = await createClient();
+  const foreign = await findForeignReference(supabase, ctx.workspace.id, [
+    ["companies", parsed.data.company_id],
+    ["contacts", parsed.data.contact_id],
+    ["deals", parsed.data.deal_id],
+    ["leads", parsed.data.lead_id],
+  ]);
+  if (foreign) return { error: foreignReferenceError(foreign) };
+
   const { error } = await supabase.from("notes").insert({
     body: parsed.data.body,
     company_id: parsed.data.company_id ?? null,
