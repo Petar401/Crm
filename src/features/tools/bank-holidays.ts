@@ -36,8 +36,32 @@ export function isDivision(value: unknown): value is BankHolidayDivision {
   );
 }
 
+/**
+ * Per-instance memo on top of Next's fetch cache. Pages that show holidays are
+ * rendered dynamically, where the fetch cache may be bypassed, so without this
+ * every dashboard load would call GOV.UK. Failures are remembered briefly so
+ * an outage costs one timeout, not one per page view.
+ */
+const MEMO_OK_MS = REVALIDATE_S * 1000;
+const MEMO_FAIL_MS = 5 * 60 * 1000;
+let memo: { at: number; feed: BankHolidayFeed | null } | null = null;
+
 /** Fetches the feed. Returns null when GOV.UK can't be reached. */
 export async function fetchBankHolidayFeed(): Promise<BankHolidayFeed | null> {
+  if (memo && Date.now() - memo.at < (memo.feed ? MEMO_OK_MS : MEMO_FAIL_MS)) {
+    return memo.feed;
+  }
+  const feed = await fetchFeedUncached();
+  memo = { at: Date.now(), feed };
+  return feed;
+}
+
+/** Test hook: forget the memoised feed. */
+export function resetBankHolidayMemo(): void {
+  memo = null;
+}
+
+async function fetchFeedUncached(): Promise<BankHolidayFeed | null> {
   try {
     const res = await fetch(FEED_URL, {
       headers: { Accept: "application/json" },

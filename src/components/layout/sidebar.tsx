@@ -5,16 +5,14 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import type { PermissionKey } from "@/lib/constants/permissions";
-import { NAV_ITEMS } from "@/components/layout/nav-items";
+import { NAV_ITEMS, isNavItemVisible } from "@/components/layout/nav-items";
 import { Logo } from "@/components/shared/logo";
 
 export function Sidebar({ allowed }: { allowed: PermissionKey[] }) {
   const pathname = usePathname();
   const allowedSet = new Set(allowed);
 
-  const items = NAV_ITEMS.filter(
-    (item) => !item.permission || allowedSet.has(item.permission)
-  );
+  const items = NAV_ITEMS.filter((item) => isNavItemVisible(item, allowedSet));
 
   return (
     <aside className="bg-sidebar hidden w-60 shrink-0 flex-col border-r md:flex">

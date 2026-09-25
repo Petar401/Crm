@@ -3,6 +3,11 @@ import { Briefcase, CheckSquare, PoundSterling, UserPlus } from "lucide-react";
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
 import { getDashboardData } from "@/features/dashboard/queries";
+import {
+  getBankHolidays,
+  upcomingHolidays,
+  todayInUk,
+} from "@/features/tools/bank-holidays";
 import { formatCurrency } from "@/lib/utils/format";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/features/dashboard/components/kpi-card";
@@ -10,15 +15,21 @@ import { PipelineFunnel } from "@/features/dashboard/components/pipeline-funnel"
 import { WinRate } from "@/features/dashboard/components/win-rate";
 import { TasksPanel } from "@/features/dashboard/components/tasks-panel";
 import { ActivityFeed } from "@/features/dashboard/components/activity-feed";
+import { BankHolidaysCard } from "@/features/dashboard/components/bank-holidays-card";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const ctx = await requireAuthContext();
-  const [data, { allowed }] = await Promise.all([
+  const [data, { allowed }, bankHolidayList] = await Promise.all([
     getDashboardData(ctx.workspace.id),
     getPermissionSet(),
+    // Never let a GOV.UK feed outage break the dashboard.
+    getBankHolidays().catch(() => null),
   ]);
+  const upcomingBankHolidays = bankHolidayList
+    ? upcomingHolidays(bankHolidayList, todayInUk(), 3)
+    : [];
 
   return (
     <div>
@@ -95,6 +106,13 @@ export default async function DashboardPage() {
         />
         <ActivityFeed activities={data.recentActivity} />
       </div>
+
+      {/* Row 4: upcoming UK bank holidays (hidden when the GOV.UK feed is unavailable) */}
+      {upcomingBankHolidays.length > 0 && (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <BankHolidaysCard holidays={upcomingBankHolidays} />
+        </div>
+      )}
     </div>
   );
 }

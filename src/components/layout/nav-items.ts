@@ -15,6 +15,7 @@ import {
   FileText,
   CreditCard,
   Calendar,
+  MapPin,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,7 +25,19 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Shown when the user holds this permission. */
   permission?: PermissionKey;
+  /** Shown when the user holds ANY of these permissions (overrides `permission`). */
+  permissions?: PermissionKey[];
+}
+
+/** Whether a nav item should be shown to a user with this permission set. */
+export function isNavItemVisible(
+  item: NavItem,
+  allowed: ReadonlySet<PermissionKey>
+): boolean {
+  if (item.permissions) return item.permissions.some((p) => allowed.has(p));
+  return !item.permission || allowed.has(item.permission);
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -47,6 +60,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Leads",
     icon: Target,
     permission: "leads.view",
+  },
+  {
+    href: "/map",
+    label: "Map",
+    icon: MapPin,
+    permissions: ["companies.view", "leads.view"],
   },
   {
     href: "/email",

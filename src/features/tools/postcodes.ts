@@ -55,6 +55,39 @@ export function toPostcodeInfo(raw: RawPostcode): PostcodeInfo {
   };
 }
 
+/**
+ * Per-instance memo of resolved postcodes (bounded, 24h), so re-opening the
+ * map doesn't re-geocode every record: dynamic pages may bypass Next's fetch
+ * cache, and bulk lookups are POSTs. Only successful lookups are kept.
+ */
+const MEMO_TTL_MS = REVALIDATE_S * 1000;
+const MEMO_MAX = 10_000;
+const memo = new Map<string, { at: number; info: PostcodeInfo }>();
+
+function memoGet(postcode: string): PostcodeInfo | null {
+  const hit = memo.get(postcode);
+  if (!hit) return null;
+  if (Date.now() - hit.at > MEMO_TTL_MS) {
+    memo.delete(postcode);
+    return null;
+  }
+  return hit.info;
+}
+
+function memoSet(postcode: string, info: PostcodeInfo): void {
+  if (memo.size >= MEMO_MAX) {
+    // Maps iterate in insertion order: drop the oldest entry.
+    const oldest = memo.keys().next().value;
+    if (oldest !== undefined) memo.delete(oldest);
+  }
+  memo.set(postcode, { at: Date.now(), info });
+}
+
+/** Test hook: forget memoised postcodes. */
+export function resetPostcodeMemo(): void {
+  memo.clear();
+}
+
 export type PostcodeLookup =
   | { status: "ok"; info: PostcodeInfo }
   | { status: "invalid" | "not_found" | "unavailable" };
@@ -63,6 +96,8 @@ export type PostcodeLookup =
 export async function lookupPostcode(input: string): Promise<PostcodeLookup> {
   const postcode = normalizeUkPostcode(input);
   if (!postcode) return { status: "invalid" };
+  const cached = memoGet(postcode);
+  if (cached) return { status: "ok", info: cached };
   try {
     const res = await fetch(
       `${BASE_URL}/postcodes/${encodeURIComponent(postcode)}`,
@@ -75,9 +110,10 @@ export async function lookupPostcode(input: string): Promise<PostcodeLookup> {
     if (res.status === 404) return { status: "not_found" };
     if (!res.ok) return { status: "unavailable" };
     const body = (await res.json()) as { result?: RawPostcode | null };
-    return body.result
-      ? { status: "ok", info: toPostcodeInfo(body.result) }
-      : { status: "not_found" };
+    if (!body.result) return { status: "not_found" };
+    const info = toPostcodeInfo(body.result);
+    memoSet(postcode, info);
+    return { status: "ok", info };
   } catch {
     return { status: "unavailable" };
   }
@@ -95,39 +131,51 @@ export async function bulkLookupPostcodes(
     new Set(inputs.map((p) => normalizeUkPostcode(p)).filter((p): p is string => !!p))
   );
   const found = new Map<string, PostcodeInfo>();
-
-  const batches: string[][] = [];
-  for (let i = 0; i < unique.length; i += BULK_LIMIT) {
-    batches.push(unique.slice(i, i + BULK_LIMIT));
+  const missing: string[] = [];
+  for (const postcode of unique) {
+    const cached = memoGet(postcode);
+    if (cached) found.set(postcode, cached);
+    else missing.push(postcode);
   }
 
-  await Promise.all(
-    batches.map(async (batch) => {
-      try {
-        const res = await fetch(`${BASE_URL}/postcodes`, {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ postcodes: batch }),
-          signal: AbortSignal.timeout(TIMEOUT_MS * 2),
-          next: { revalidate: REVALIDATE_S },
-        });
-        if (!res.ok) return;
-        const body = (await res.json()) as {
-          result?: { query: string; result: RawPostcode | null }[];
-        };
-        for (const item of body.result ?? []) {
-          if (!item.result) continue;
-          const key = normalizeUkPostcode(item.query);
-          if (key) found.set(key, toPostcodeInfo(item.result));
-        }
-      } catch {
-        // Network/timeout: leave this batch unresolved.
+  const batches: string[][] = [];
+  for (let i = 0; i < missing.length; i += BULK_LIMIT) {
+    batches.push(missing.slice(i, i + BULK_LIMIT));
+  }
+
+  // A few batches at a time — postcodes.io is a free, fair-use service.
+  const CONCURRENCY = 4;
+  const runBatch = async (batch: string[]) => {
+    try {
+      const res = await fetch(`${BASE_URL}/postcodes`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ postcodes: batch }),
+        signal: AbortSignal.timeout(TIMEOUT_MS * 2),
+        next: { revalidate: REVALIDATE_S },
+      });
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        result?: { query: string; result: RawPostcode | null }[];
+      };
+      for (const item of body.result ?? []) {
+        if (!item.result) continue;
+        const key = normalizeUkPostcode(item.query);
+        if (!key) continue;
+        const info = toPostcodeInfo(item.result);
+        found.set(key, info);
+        memoSet(key, info);
       }
-    })
-  );
+    } catch {
+      // Network/timeout: leave this batch unresolved.
+    }
+  };
+  for (let i = 0; i < batches.length; i += CONCURRENCY) {
+    await Promise.all(batches.slice(i, i + CONCURRENCY).map(runBatch));
+  }
 
   return found;
 }

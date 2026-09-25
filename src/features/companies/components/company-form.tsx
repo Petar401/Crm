@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { companySchema, type CompanyInput } from "@/features/companies/schemas";
 import { createCompany, updateCompany } from "@/features/companies/actions";
+import { lookupPostcodeAction } from "@/features/tools/actions";
 import type { Company } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ interface CompanyFormProps {
 export function CompanyForm({ open, onOpenChange, company }: CompanyFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [lookupPending, startLookupTransition] = useTransition();
   const isEdit = !!company;
 
   const form = useForm<CompanyInput>({
@@ -61,6 +63,31 @@ export function CompanyForm({ open, onOpenChange, company }: CompanyFormProps) {
       status: company?.status ?? "lead",
     },
   });
+
+  function lookupPostcode() {
+    const postcode = form.getValues("postcode");
+    if (!postcode?.trim()) {
+      toast.error("Enter a postcode first.");
+      return;
+    }
+    startLookupTransition(async () => {
+      const result = await lookupPostcodeAction(postcode);
+      if (result.status === "ok") {
+        form.setValue("postcode", result.info.postcode, { shouldDirty: true });
+        if (result.info.district) {
+          form.setValue("city", result.info.district, { shouldDirty: true });
+        }
+        form.setValue("country", "United Kingdom", { shouldDirty: true });
+        toast.success("Postcode found");
+      } else if (result.status === "invalid") {
+        toast.error("That doesn't look like a UK postcode.");
+      } else if (result.status === "not_found") {
+        toast.error("That postcode couldn't be found.");
+      } else {
+        toast.error("Couldn't look up that postcode right now.");
+      }
+    });
+  }
 
   function onSubmit(values: CompanyInput) {
     startTransition(async () => {
@@ -222,9 +249,20 @@ export function CompanyForm({ open, onOpenChange, company }: CompanyFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Postcode</FormLabel>
-                    <FormControl>
-                      <Input placeholder="NR1" {...field} />
-                    </FormControl>
+                    <div className="flex gap-1.5">
+                      <FormControl>
+                        <Input placeholder="NR1" {...field} />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={lookupPending}
+                        onClick={lookupPostcode}
+                      >
+                        {lookupPending ? "…" : "Look up"}
+                      </Button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}

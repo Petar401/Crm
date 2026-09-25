@@ -22,6 +22,26 @@ user-triggered **AI** actions (Groq or OpenRouter) executed server-side only.
   create and update them, and log activity, all under your own permissions. See
   [Connect Claude Desktop](#connect-claude-desktop).
 
+## Free built-in tools
+
+These work out of the box, with no API key, signup or environment variable:
+
+| Tool | Where | Powered by |
+|---|---|---|
+| **CSV export** of companies, contacts, deals, leads and tasks | *Export* menu on each list page | Built in (formula-injection safe, opens cleanly in Excel) |
+| **CSV import** of companies and contacts | *Import CSV* on the Companies / Contacts pages | Built in (auto-maps common headers, skips duplicates) |
+| **vCard export** (all contacts or one) | Contacts *Export* menu, contact page | Built in (vCard 3.0 for iOS, Android, Outlook) |
+| **Calendar feed (.ics)** of open tasks and deal close dates | Tasks / Deals *Export* menu | Built in |
+| **UK postcode lookup** — fills town, county and country | *Look up* next to postcode on company and lead forms | [postcodes.io](https://postcodes.io) (open data) |
+| **UK bank holidays** — dashboard card, badge on tasks due on one | Dashboard, Tasks | [GOV.UK bank-holidays.json](https://www.gov.uk/bank-holidays.json) |
+| **Map of companies and leads** by postcode | *Map* in the sidebar | postcodes.io + [OpenStreetMap](https://www.openstreetmap.org/copyright) tiles via Leaflet |
+| **Email domain check** — does the domain accept mail? | *Check email* on contact and lead pages | The server's own DNS (MX lookup) |
+
+The postcode, bank-holiday and email-domain tools are also available to **Aria** and to the
+**Claude connector** (`lookup_uk_postcode`, `uk_bank_holidays`, `check_email_domain`).
+Exports require the matching *view* permission and are recorded in the audit log; imports require
+*create*.
+
 ## Tech stack
 
 | Layer | Choice |

@@ -11,6 +11,7 @@ import { getMemberOptions } from "@/features/team/queries";
 import { getStages } from "@/features/deals/queries";
 import { CampaignsList } from "@/features/leads/components/campaigns-list";
 import { LeadsTable } from "@/features/leads/components/leads-table";
+import { ExportMenu } from "@/features/tools/components/export-menu";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 
@@ -42,14 +43,17 @@ export default async function LeadsPage() {
         title="Leads"
         description="Automated lead discovery from OpenStreetMap, scored by AI"
         action={
-          canImport ? (
-            <Button variant="outline" asChild>
-              <Link href="/leads/apollo">
-                <PlugZap className="size-4" />
-                Search Apollo
-              </Link>
-            </Button>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <ExportMenu entity="leads" />
+            {canImport && (
+              <Button variant="outline" asChild>
+                <Link href="/leads/apollo">
+                  <PlugZap className="size-4" />
+                  Search Apollo
+                </Link>
+              </Button>
+            )}
+          </div>
         }
       />
 

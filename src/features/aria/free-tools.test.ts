@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FREE_TOOL_DEFINITIONS, runFreeTool } from "./free-tools";
+import { resetBankHolidayMemo } from "@/features/tools/bank-holidays";
+import { resetPostcodeMemo } from "@/features/tools/postcodes";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  resetBankHolidayMemo();
+  resetPostcodeMemo();
 });
 
 describe("Aria free tools", () => {
@@ -72,6 +76,16 @@ describe("Aria free tools", () => {
     );
     const out = JSON.parse((await runFreeTool("uk_bank_holidays", '{"date":"2026-12-25"}'))!);
     expect(out).toMatchObject({ isBankHoliday: true, holiday: { title: "Christmas Day" } });
+  });
+
+  it("memoises the holiday feed so repeat calls don't refetch", async () => {
+    const fetchSpy = vi.fn(async () =>
+      Response.json({ "england-and-wales": { events: [] } })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    await runFreeTool("uk_bank_holidays", "{}");
+    await runFreeTool("uk_bank_holidays", "{}");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it("degrades gracefully when GOV.UK is down", async () => {

@@ -9,6 +9,7 @@ import {
   getContactOptions,
 } from "@/features/deals/queries";
 import { getCompanyOptions } from "@/features/contacts/queries";
+import { ExportMenu } from "@/features/tools/components/export-menu";
 import { PageHeader } from "@/components/shared/page-header";
 
 // DealsBoard pulls the drag-and-drop kanban client into its own chunk.
@@ -34,7 +35,11 @@ export default async function DealsPage() {
 
   return (
     <div>
-      <PageHeader title="Deals" description="Your sales pipeline" />
+      <PageHeader
+        title="Deals"
+        description="Your sales pipeline"
+        action={<ExportMenu entity="deals" calendar />}
+      />
       <DealsBoard
         deals={deals}
         stages={stages}

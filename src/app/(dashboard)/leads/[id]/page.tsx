@@ -14,6 +14,7 @@ import { getEntityAttachments } from "@/features/attachments/queries";
 import { getEntityActivities } from "@/features/activities/queries";
 import { LeadDetailTabs } from "@/features/leads/components/lead-detail-tabs";
 import { LeadDetailActions } from "@/features/leads/components/lead-detail-actions";
+import { EmailCheckButton } from "@/features/tools/components/email-check-button";
 import {
   scoreTier,
   SCORE_TIER_LABEL,
@@ -138,7 +139,15 @@ export default async function LeadDetailPage({
                 <Row label="Website" value={lead.website} />
               )}
               {lead.phone && <Row label="Phone" value={lead.phone} />}
-              {lead.email && <Row label="Email" value={lead.email} />}
+              {lead.email && (
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">Email</span>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-right">{lead.email}</span>
+                    <EmailCheckButton email={lead.contact_email ?? lead.email} />
+                  </div>
+                </div>
+              )}
               {lead.contact_name && (
                 <div className="border-t pt-3">
                   <p className="text-muted-foreground text-xs">Contact</p>
@@ -149,9 +158,14 @@ export default async function LeadDetailPage({
                     </p>
                   )}
                   {lead.contact_email && (
-                    <p className="text-muted-foreground text-xs">
-                      {lead.contact_email}
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-muted-foreground text-xs">
+                        {lead.contact_email}
+                      </p>
+                      {!lead.email && (
+                        <EmailCheckButton email={lead.contact_email} />
+                      )}
+                    </div>
                   )}
                 </div>
               )}
