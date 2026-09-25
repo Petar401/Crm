@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Mail, Phone, Briefcase, Link2 } from "lucide-react";
+import { ArrowLeft, Download, Mail, Phone, Briefcase, Link2 } from "lucide-react";
 
 import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
@@ -10,6 +10,7 @@ import { getNotes } from "@/features/notes/queries";
 import { getEntityAttachments } from "@/features/attachments/queries";
 import { getEntityActivities } from "@/features/activities/queries";
 import { ContactDetailTabs } from "@/features/contacts/components/contact-detail-tabs";
+import { EmailCheckButton } from "@/features/tools/components/email-check-button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +52,15 @@ export default async function ContactDetailPage({
         title={contact.full_name}
         description={contact.job_title ?? undefined}
         action={
-          contact.is_primary ? <Badge variant="secondary">Primary</Badge> : undefined
+          <div className="flex items-center gap-2">
+            {contact.is_primary && <Badge variant="secondary">Primary</Badge>}
+            <Button variant="outline" size="sm" asChild>
+              <a href={`/api/export/vcard?id=${contact.id}`} download>
+                <Download className="size-4" />
+                Download vCard
+              </a>
+            </Button>
+          </div>
         }
       />
 
@@ -88,11 +97,14 @@ export default async function ContactDetailPage({
                 </div>
               )}
               {contact.email && (
-                <div className="flex items-center gap-2">
-                  <Mail className="text-muted-foreground size-4" />
-                  <a href={`mailto:${contact.email}`} className="hover:underline">
-                    {contact.email}
-                  </a>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Mail className="text-muted-foreground size-4" />
+                    <a href={`mailto:${contact.email}`} className="hover:underline">
+                      {contact.email}
+                    </a>
+                  </div>
+                  <EmailCheckButton email={contact.email} />
                 </div>
               )}
               {contact.phone && (

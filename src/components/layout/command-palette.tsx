@@ -172,6 +172,12 @@ function CommandPaletteDialog({
         run: () => router.push("/tasks"),
       },
       {
+        id: "jump-map",
+        label: "Go to map",
+        icon: ArrowRight,
+        run: () => router.push("/map"),
+      },
+      {
         id: "jump-email",
         label: "Go to email",
         icon: ArrowRight,

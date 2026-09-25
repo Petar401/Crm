@@ -8,6 +8,8 @@ import { toast } from "sonner";
 
 import { leadSchema, type LeadInput } from "@/features/leads/schemas";
 import { createLead, updateLead } from "@/features/leads/actions";
+import { lookupPostcodeAction } from "@/features/tools/actions";
+import { addressFillFromPostcode } from "@/lib/utils/postcode";
 import type { MemberOption } from "@/features/team/queries";
 import type { Lead } from "@/lib/db/types";
 import { Button } from "@/components/ui/button";
@@ -46,6 +48,7 @@ interface LeadFormProps {
 export function LeadForm({ open, onOpenChange, members, lead }: LeadFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [lookupPending, startLookupTransition] = useTransition();
   const isEdit = !!lead;
 
   const form = useForm<LeadInput>({
@@ -70,6 +73,39 @@ export function LeadForm({ open, onOpenChange, members, lead }: LeadFormProps) {
       match_score: lead?.match_score != null ? String(lead.match_score) : "",
     },
   });
+
+  function lookupPostcode() {
+    const postalCode = form.getValues("postal_code");
+    if (!postalCode?.trim()) {
+      toast.error("Enter a postcode first.");
+      return;
+    }
+    startLookupTransition(async () => {
+      const result = await lookupPostcodeAction(postalCode);
+      if (result.status === "ok") {
+        form.setValue("postal_code", result.info.postcode, { shouldDirty: true });
+        const fill = addressFillFromPostcode(result.info, {
+          city: form.getValues("city"),
+          county: form.getValues("state"),
+          country: form.getValues("country"),
+        });
+        if (fill.city) form.setValue("city", fill.city, { shouldDirty: true });
+        if (fill.county) form.setValue("state", fill.county, { shouldDirty: true });
+        if (fill.country) form.setValue("country", fill.country, { shouldDirty: true });
+        toast.success(
+          result.info.district
+            ? `Postcode found: ${result.info.district}`
+            : "Postcode found"
+        );
+      } else if (result.status === "invalid") {
+        toast.error("That doesn't look like a UK postcode.");
+      } else if (result.status === "not_found") {
+        toast.error("That postcode couldn't be found.");
+      } else {
+        toast.error("Couldn't look up that postcode right now.");
+      }
+    });
+  }
 
   function onSubmit(values: LeadInput) {
     startTransition(async () => {
@@ -217,9 +253,20 @@ export function LeadForm({ open, onOpenChange, members, lead }: LeadFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Postal code</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    <div className="flex gap-1.5">
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={lookupPending}
+                        onClick={lookupPostcode}
+                      >
+                        {lookupPending ? "…" : "Look up"}
+                      </Button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -4,6 +4,8 @@ import { requireAuthContext } from "@/lib/auth/session";
 import { getPermissionSet } from "@/lib/auth/permissions";
 import { getContacts, getCompanyOptions } from "@/features/contacts/queries";
 import { ContactsTable } from "@/features/contacts/components/contacts-table";
+import { ExportMenu } from "@/features/tools/components/export-menu";
+import { ImportDialog } from "@/features/tools/components/import-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +22,21 @@ export default async function ContactsPage() {
 
   return (
     <div>
-      <PageHeader title="Contacts" description="People in your CRM" />
+      <PageHeader
+        title="Contacts"
+        description="People in your CRM"
+        action={
+          <div className="flex items-center gap-2">
+            {allowed.has("contacts.create") && (
+              <ImportDialog
+                entity="contacts"
+                canCreateCompanies={allowed.has("companies.create")}
+              />
+            )}
+            <ExportMenu entity="contacts" vcard />
+          </div>
+        }
+      />
       <ContactsTable
         contacts={contacts}
         companies={companies}

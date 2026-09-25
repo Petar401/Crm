@@ -38,6 +38,16 @@ import { sendEmail } from "@/features/email/actions";
 import { resolveEmailCredentials } from "@/features/email/settings-queries";
 import { fetchInbox } from "@/features/email/transport";
 import { getSentEmails } from "@/features/email/queries";
+import { lookupPostcode } from "@/features/tools/postcodes";
+import {
+  BANK_HOLIDAY_DIVISIONS,
+  DEFAULT_DIVISION,
+  bankHolidayOn,
+  getBankHolidays,
+  todayInUk,
+  upcomingHolidays,
+} from "@/features/tools/bank-holidays";
+import { checkEmailDomain } from "@/features/tools/email-domain";
 
 type ToolResult = {
   content: { type: "text"; text: string }[];
@@ -606,6 +616,78 @@ export function registerCrmTools(server: McpServer): void {
         await requirePermission("leads.view");
         const result = await draftLeadEmail(lead_id);
         return result.error ? fail(result.error) : ok({ text: result.text });
+      })
+  );
+
+  // ------------------------------------------------- free public-data tools
+  // Keyless lookups (postcodes.io, GOV.UK, DNS). They read no workspace data,
+  // so an authenticated member is all they require.
+
+  server.registerTool(
+    "lookup_uk_postcode",
+    {
+      title: "Look up a UK postcode",
+      description:
+        "Return the local authority district, county, region, nation, ward, constituency and latitude/longitude for a UK postcode (via postcodes.io).",
+      inputSchema: z.object({ postcode: z.string().trim().min(5).max(16) }),
+    },
+    async ({ postcode }) =>
+      guard(async () => {
+        await requireAuthContext();
+        const result = await lookupPostcode(postcode);
+        if (result.status === "ok") return ok(result.info);
+        return fail(
+          {
+            invalid: "Not a valid UK postcode.",
+            not_found: "Postcode not found.",
+            unavailable: "The postcode service is unavailable right now.",
+          }[result.status]
+        );
+      })
+  );
+
+  server.registerTool(
+    "uk_bank_holidays",
+    {
+      title: "UK bank holidays",
+      description:
+        "List upcoming UK bank holidays (from GOV.UK), or check whether a date is one. Useful before setting due dates or booking visits.",
+      inputSchema: z.object({
+        division: z.enum(BANK_HOLIDAY_DIVISIONS).optional(),
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+          .optional(),
+        count: z.number().int().min(1).max(20).optional(),
+      }),
+    },
+    async ({ division, date, count }) =>
+      guard(async () => {
+        await requireAuthContext();
+        const div = division ?? DEFAULT_DIVISION;
+        const holidays = await getBankHolidays(div);
+        if (!holidays) return fail("The GOV.UK bank holiday feed is unavailable right now.");
+        if (date) {
+          const holiday = bankHolidayOn(holidays, date);
+          return ok({ division: div, date, isBankHoliday: Boolean(holiday), holiday });
+        }
+        const today = todayInUk();
+        return ok({ division: div, today, upcoming: upcomingHolidays(holidays, today, count ?? 5) });
+      })
+  );
+
+  server.registerTool(
+    "check_email_domain",
+    {
+      title: "Check an email domain",
+      description:
+        "Check whether an email address's domain can receive mail (DNS MX lookup). Proves the domain accepts email, not that the mailbox exists.",
+      inputSchema: z.object({ email: z.string().trim().min(3).max(320) }),
+    },
+    async ({ email }) =>
+      guard(async () => {
+        await requireAuthContext();
+        return ok(await checkEmailDomain(email));
       })
   );
 }

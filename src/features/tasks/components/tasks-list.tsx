@@ -10,7 +10,9 @@ import type { MemberOption } from "@/features/team/queries";
 import { deleteTask, setTaskStatus } from "@/features/tasks/actions";
 import { TaskForm } from "@/features/tasks/components/task-form";
 import { formatDateTime } from "@/lib/utils/format";
+import { bankHolidayOn, type BankHolidaySlim } from "@/lib/utils/bank-holidays";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -29,6 +31,8 @@ interface TasksListProps {
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
+  /** UK bank holidays for the "Bank holiday" badge; empty when unavailable. */
+  bankHolidays?: BankHolidaySlim[];
 }
 
 export function TasksList({
@@ -38,6 +42,7 @@ export function TasksList({
   canCreate,
   canUpdate,
   canDelete,
+  bankHolidays = [],
 }: TasksListProps) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
@@ -90,6 +95,7 @@ export function TasksList({
         <div className="divide-y rounded-lg border">
           {tasks.map((task) => {
             const done = task.status === "done";
+            const holiday = bankHolidayOn(bankHolidays, task.due_at);
             return (
               <div
                 key={task.id}
@@ -116,6 +122,11 @@ export function TasksList({
                     {task.company?.name && <span>· {task.company.name}</span>}
                   </div>
                 </div>
+                {holiday && (
+                  <Badge variant="secondary" title={holiday.title}>
+                    Bank holiday
+                  </Badge>
+                )}
                 <StatusBadge status={task.priority} />
                 <StatusBadge status={task.status} />
                 {(canUpdate || canDelete) && (
@@ -156,6 +167,7 @@ export function TasksList({
           onOpenChange={setCreateOpen}
           members={members}
           companies={companies}
+          bankHolidays={bankHolidays}
         />
       )}
       {editing && (
@@ -165,6 +177,7 @@ export function TasksList({
           members={members}
           companies={companies}
           task={editing}
+          bankHolidays={bankHolidays}
         />
       )}
       <ConfirmDialog

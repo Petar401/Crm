@@ -5,9 +5,10 @@ import type OpenAI from "openai";
 import { createAiClient } from "@/features/ai/client";
 import { AI_PROVIDERS } from "@/features/ai/providers";
 import type { AiCredentials } from "@/features/ai/settings-queries";
+import { FREE_TOOL_DEFINITIONS, runFreeTool } from "@/features/aria/free-tools";
 
-/** Safety bound on the tool-calling loop (read_workspace_file rounds). */
-const MAX_TOOL_ROUNDS = 4;
+/** Safety bound on the tool-calling loop (rounds of tool calls). */
+const MAX_TOOL_ROUNDS = 6;
 
 const SYSTEM_INSTRUCTION = `You are Aria, a smart and helpful AI assistant embedded in a B2B sales CRM. Your team's full CRM data is provided as context at the start of each conversation.
 
@@ -20,6 +21,8 @@ Reading documents: the "files" and "invoices" lists tell you which documents exi
 The workspace also runs an automated lead finder that discovers new businesses and lists them under "leads" in the context (see "leadCampaigns" for the campaigns that produce them). You can help draft first-touch cold-outreach emails for these newly discovered leads: use the workspace's business description and the lead's details, and keep them short — a relevant hook, one line of value, and a soft call to action.
 
 Some lists in the context are capped for size (see the "_meta" object, which gives a returned count and a capped flag per entity). If a list is capped, more records may exist than are shown — say so rather than assuming the list is exhaustive, and suggest the user search or filter in the CRM UI directly for a complete answer.
+
+Built-in lookup tools (free public data, no setup): lookup_uk_postcode (district, county, region and coordinates for a UK postcode), uk_bank_holidays (upcoming UK bank holidays, or whether a date is one — check before suggesting due dates or visits) and check_email_domain (whether an email's domain can receive mail). Call them when they would make an answer more accurate; don't guess what they would return.
 
 Be concise, professional, and actionable. Write in clear British English. When referencing CRM data, cite the specific records you draw from. Never invent facts — only use what is in the provided context or files you have read; in particular, never invent a contact's name.`;
 
@@ -43,6 +46,7 @@ const TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
       },
     },
   },
+  ...FREE_TOOL_DEFINITIONS,
 ];
 
 export interface ChatPart {
@@ -184,7 +188,9 @@ export async function runAriaChat(
           result = `[Could not read the requested file: ${reason}.]`;
         }
       } else {
-        result = `[Unknown tool: ${call.function.name}.]`;
+        result =
+          (await runFreeTool(call.function.name, call.function.arguments)) ??
+          `[Unknown tool: ${call.function.name}.]`;
       }
       messages.push({
         role: "tool",
@@ -204,6 +210,32 @@ export async function runAriaChat(
       );
     }
     choice = completion.choices[0].message;
+  }
+
+  // Hit the round limit while the model still wanted tools: ask once more,
+  // with tools disabled, for an answer from what it has gathered so far —
+  // otherwise the user would get an empty reply.
+  if (toolsEnabled && choice.tool_calls?.length && !choice.content?.trim()) {
+    try {
+      const final = await client.chat.completions.create({
+        model,
+        messages: [
+          ...messages,
+          {
+            role: "user",
+            content:
+              "Please answer now using the information you already have, without calling more tools.",
+          },
+        ],
+        tools: TOOLS,
+        tool_choice: "none",
+      });
+      const text = final.choices?.[0]?.message?.content?.trim();
+      if (text) return text;
+    } catch (e) {
+      console.error(`Aria: final no-tools completion failed for model "${model}":`, e);
+    }
+    return "I gathered some information but couldn't finish the answer. Try asking a narrower question.";
   }
 
   return choice.content?.trim() ?? "";

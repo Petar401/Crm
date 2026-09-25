@@ -67,3 +67,18 @@ export function initialsOf(name: string | null | undefined): string {
     .join("")
     .toUpperCase();
 }
+
+/**
+ * An ISO timestamp as a `<input type="datetime-local">` value in the user's
+ * local time ("2026-05-25T09:00"). Slicing the UTC string instead shows the
+ * UTC wall time, which then saves back as local — shifting the time by the
+ * UTC offset (an hour during BST) on every edit.
+ */
+export function toDateTimeLocalValue(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}

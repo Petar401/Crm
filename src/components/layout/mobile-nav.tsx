@@ -7,7 +7,7 @@ import { Menu } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { PermissionKey } from "@/lib/constants/permissions";
-import { NAV_ITEMS } from "@/components/layout/nav-items";
+import { NAV_ITEMS, isNavItemVisible } from "@/components/layout/nav-items";
 import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,9 +23,7 @@ export function MobileNav({ allowed }: { allowed: PermissionKey[] }) {
   const [open, setOpen] = useState(false);
   const allowedSet = new Set(allowed);
 
-  const items = NAV_ITEMS.filter(
-    (item) => !item.permission || allowedSet.has(item.permission)
-  );
+  const items = NAV_ITEMS.filter((item) => isNavItemVisible(item, allowedSet));
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
