@@ -11,6 +11,10 @@ export const NOTIFICATION_KINDS: NotificationKind[] = [
   "email_received",
   "workspace_invited",
   "member_joined",
+  "quote_signed",
+  "invoice_paid",
+  "invoice_overdue",
+  "booking_created",
 ];
 
 export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
@@ -24,6 +28,10 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   email_received: "Email received",
   workspace_invited: "Invited to a workspace",
   member_joined: "New teammate joined",
+  quote_signed: "Quote signed by customer",
+  invoice_paid: "Invoice paid",
+  invoice_overdue: "Invoice overdue",
+  booking_created: "New booking on your calendar link",
 };
 
 export const DEFAULT_IN_APP: Set<NotificationKind> = new Set(NOTIFICATION_KINDS);
